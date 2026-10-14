@@ -143,12 +143,6 @@ sync-interval-seconds = 30
 change-source        = "polling"                 # "polling" | "events"
 sync-mode            = "on-demand"               # "on-demand" | "full" — only used by polling
 event-queue          = ""                        # SQS URL/name, required for events
-
-[telemetry]                                       # optional, omitted = OTel disabled
-otlp-endpoint        = "http://localhost:4317"   # OTLP collector URL
-otlp-protocol        = "grpc"                    # "grpc" | "http-protobuf"
-service-name         = "osvfs"                   # service.name resource attribute
-metrics-listen       = "127.0.0.1:9999"          # local Prometheus /metrics listener (host:port)
 ```
 
 A ready-to-edit sample is shipped as

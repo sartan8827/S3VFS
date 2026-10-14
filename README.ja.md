@@ -73,8 +73,7 @@ S3 互換サービスはサポート対象外です。
 - **[同期と変更イベント](docs/sync-and-events.ja.md)** — ポーリング /
   push モードの変更検出、オンデマンド同期、読み取り専用マウント、
   SQS の構成。
-- **[可観測性](docs/observability.ja.md)** — 構造化ログ、OpenTelemetry
-  トレース / メトリクス、ローカル Prometheus リスナー、ユーザー定義
+- **[可観測性](docs/observability.ja.md)** — 構造化ログとユーザー定義
   メタデータの往復保持。
 - **[認証とクレデンシャル](docs/credentials.ja.md)** — OSVFS の
   クレデンシャルストアと AWS shared profile / SSO / `aws login`。

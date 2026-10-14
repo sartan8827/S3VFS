@@ -1,5 +1,4 @@
 using Microsoft.Windows.ProjFS;
-using OSVFS.Diagnostics;
 
 namespace OSVFS.ProjFs;
 
@@ -129,12 +128,7 @@ internal sealed class NotificationCallbacks
         uint triggeringProcessId,
         string triggeringProcessImageFileName)
     {
-        using var scope = OsvfsTelemetry.StartProjFsOperation("ProjFS.PreDelete");
-        scope.SetTag("relative.path", relativePath);
-        scope.SetTag("is.directory", isDirectory);
-        var allow = !ReadOnly;
-        scope.SetTag("projfs.allowed", allow);
-        return allow;
+        return !ReadOnly;
     }
 
     /// <summary>
@@ -146,12 +140,7 @@ internal sealed class NotificationCallbacks
         uint triggeringProcessId,
         string triggeringProcessImageFileName)
     {
-        using var scope = OsvfsTelemetry.StartProjFsOperation("ProjFS.PreRename");
-        scope.SetTag("relative.path", relativePath);
-        scope.SetTag("destination.path", destinationPath);
-        var allow = !ReadOnly;
-        scope.SetTag("projfs.allowed", allow);
-        return allow;
+        return !ReadOnly;
     }
 
     /// <summary>
@@ -163,12 +152,7 @@ internal sealed class NotificationCallbacks
         uint triggeringProcessId,
         string triggeringProcessImageFileName)
     {
-        using var scope = OsvfsTelemetry.StartProjFsOperation("ProjFS.PreCreateHardlink");
-        scope.SetTag("relative.path", relativePath);
-        scope.SetTag("destination.path", destinationPath);
-        var allow = !ReadOnly;
-        scope.SetTag("projfs.allowed", allow);
-        return allow;
+        return !ReadOnly;
     }
 
     /// <summary>
@@ -186,10 +170,6 @@ internal sealed class NotificationCallbacks
         notificationMask = NotificationType.UseExistingMask;
         if (ReadOnly) return;
 
-        using var scope = OsvfsTelemetry.StartProjFsOperation("ProjFS.FileRenamed");
-        scope.SetTag("relative.path", relativePath);
-        scope.SetTag("destination.path", destinationPath);
-        scope.SetTag("is.directory", isDirectory);
         provider.HandleFileRenamed(relativePath, destinationPath, isDirectory);
     }
 
@@ -229,12 +209,6 @@ internal sealed class NotificationCallbacks
     {
         if (ReadOnly) return;
 
-        using var scope = OsvfsTelemetry.StartProjFsOperation("ProjFS.FileHandleClosedFileModifiedOrDeleted");
-        scope.SetTag("relative.path", relativePath);
-        scope.SetTag("is.directory", isDirectory);
-        scope.SetTag("file.modified", isFileModified);
-        scope.SetTag("file.deleted", isFileDeleted);
-
         // Deletion takes precedence: a deleted file cannot be uploaded.
         if (isFileDeleted)
         {
@@ -257,10 +231,6 @@ internal sealed class NotificationCallbacks
         uint triggeringProcessId,
         string triggeringProcessImageFileName)
     {
-        using var scope = OsvfsTelemetry.StartProjFsOperation("ProjFS.PreConvertToFull");
-        scope.SetTag("relative.path", relativePath);
-        var allow = !ReadOnly;
-        scope.SetTag("projfs.allowed", allow);
-        return allow;
+        return !ReadOnly;
     }
 }

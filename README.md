@@ -71,8 +71,7 @@ The detailed reference is split into focused pages under
 - **[Synchronization and change events](docs/sync-and-events.md)** —
   polling vs. push-mode change detection, on-demand sync, read-only
   mounts, and SQS setup.
-- **[Observability](docs/observability.md)** — structured logging,
-  OpenTelemetry traces / metrics, the local Prometheus listener, and
+- **[Observability](docs/observability.md)** — structured logging and
   user-metadata round-trip.
 - **[Authentication and credentials](docs/credentials.md)** — the OSVFS
   credential store and AWS shared profile / SSO / `aws login`.

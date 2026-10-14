@@ -144,12 +144,6 @@ sync-interval-seconds = 30
 change-source        = "polling"                 # "polling" | "events"
 sync-mode            = "on-demand"               # "on-demand" | "full" — polling 時のみ有効
 event-queue          = ""                        # SQS URL/名。events で必須
-
-[telemetry]                                       # 任意。省略で OTel 無効
-otlp-endpoint        = "http://localhost:4317"   # OTLP コレクター URL
-otlp-protocol        = "grpc"                    # "grpc" | "http-protobuf"
-service-name         = "osvfs"                   # service.name リソース属性
-metrics-listen       = "127.0.0.1:9999"          # ローカル Prometheus /metrics リスナー (host:port)
 ```
 
 編集用のサンプル [`osvfs.toml.example`](./osvfs.toml.example) をリポジトリ

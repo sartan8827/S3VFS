@@ -2,7 +2,6 @@ using Amazon.Runtime;
 using Amazon.S3;
 using Amazon.S3.Model;
 using Amazon.S3.Transfer;
-using OSVFS.Diagnostics;
 using OSVFS.Net;
 using System.Net;
 using System.Runtime.CompilerServices;
@@ -290,16 +289,7 @@ internal sealed class S3Backend : IObjectStoreBackend, IDisposable
     }
 
     /// <inheritdoc/>
-    public IAsyncEnumerable<ObjectInfo> ListAsync(
-        string relativeDirectory,
-        CancellationToken ct) =>
-        TelemetryAsyncEnumerable.Instrument(
-            "S3.List",
-            ListInternalAsync(relativeDirectory, ct),
-            scope => scope.SetTag("relative.directory", relativeDirectory),
-            ct);
-
-    private async IAsyncEnumerable<ObjectInfo> ListInternalAsync(
+    public async IAsyncEnumerable<ObjectInfo> ListAsync(
         string relativeDirectory,
         [EnumeratorCancellation] CancellationToken ct)
     {
@@ -336,14 +326,7 @@ internal sealed class S3Backend : IObjectStoreBackend, IDisposable
     }
 
     /// <inheritdoc/>
-    public IAsyncEnumerable<ObjectInfo> ListAllAsync(CancellationToken ct) =>
-        TelemetryAsyncEnumerable.Instrument(
-            "S3.ListAll",
-            ListAllInternalAsync(ct),
-            setupTags: null,
-            ct);
-
-    private async IAsyncEnumerable<ObjectInfo> ListAllInternalAsync(
+    public async IAsyncEnumerable<ObjectInfo> ListAllAsync(
         [EnumeratorCancellation] CancellationToken ct)
     {
         var request = new ListObjectsV2Request
@@ -361,16 +344,7 @@ internal sealed class S3Backend : IObjectStoreBackend, IDisposable
     }
 
     /// <inheritdoc/>
-    public IAsyncEnumerable<ObjectInfo> ListRecursiveAsync(
-        string relativeDirectory,
-        CancellationToken ct) =>
-        TelemetryAsyncEnumerable.Instrument(
-            "S3.ListRecursive",
-            ListRecursiveInternalAsync(relativeDirectory, ct),
-            scope => scope.SetTag("relative.directory", relativeDirectory),
-            ct);
-
-    private async IAsyncEnumerable<ObjectInfo> ListRecursiveInternalAsync(
+    public async IAsyncEnumerable<ObjectInfo> ListRecursiveAsync(
         string relativeDirectory,
         [EnumeratorCancellation] CancellationToken ct)
     {
@@ -412,9 +386,6 @@ internal sealed class S3Backend : IObjectStoreBackend, IDisposable
     /// <inheritdoc/>
     public async Task<ObjectInfo?> HeadAsync(string relativePath, CancellationToken ct)
     {
-        using var scope = OsvfsTelemetry.StartS3Operation("S3.Head");
-        scope.SetTag("relative.path", relativePath);
-
         var relKey = KeyPath.ToObjectKey(relativePath);
         if (relKey.Length == 0)
         {
@@ -443,37 +414,24 @@ internal sealed class S3Backend : IObjectStoreBackend, IDisposable
         catch (AmazonS3Exception ex) when (ex.StatusCode == HttpStatusCode.NotFound)
         {
             var dirPrefix = fullKey.EndsWith('/') ? fullKey : fullKey + '/';
-            try
+            var listResp = await WithRefreshRetryAsync(() => client.ListObjectsV2Async(new ListObjectsV2Request
             {
-                var listResp = await WithRefreshRetryAsync(() => client.ListObjectsV2Async(new ListObjectsV2Request
-                {
-                    BucketName = bucketName,
-                    Prefix = dirPrefix,
-                    MaxKeys = 1,
-                }, ct)).ConfigureAwait(false);
+                BucketName = bucketName,
+                Prefix = dirPrefix,
+                MaxKeys = 1,
+            }, ct)).ConfigureAwait(false);
 
-                if ((listResp.S3Objects?.Count ?? 0) > 0 || (listResp.CommonPrefixes?.Count ?? 0) > 0)
-                {
-                    return new ObjectInfo(
-                        Key: relKey,
-                        RelativePath: KeyPath.ToRelativePath(relKey),
-                        Size: 0,
-                        LastModified: default,
-                        ETag: string.Empty,
-                        IsDirectory: true);
-                }
-                return null;
-            }
-            catch (Exception listEx)
+            if ((listResp.S3Objects?.Count ?? 0) > 0 || (listResp.CommonPrefixes?.Count ?? 0) > 0)
             {
-                scope.Fail(listEx);
-                throw;
+                return new ObjectInfo(
+                    Key: relKey,
+                    RelativePath: KeyPath.ToRelativePath(relKey),
+                    Size: 0,
+                    LastModified: default,
+                    ETag: string.Empty,
+                    IsDirectory: true);
             }
-        }
-        catch (Exception ex)
-        {
-            scope.Fail(ex);
-            throw;
+            return null;
         }
     }
 
@@ -482,11 +440,6 @@ internal sealed class S3Backend : IObjectStoreBackend, IDisposable
         string relativePath, long offset, long length, Stream destination, CancellationToken ct)
     {
         if (length == 0) return;
-
-        using var scope = OsvfsTelemetry.StartS3Operation("S3.Get");
-        scope.SetTag("relative.path", relativePath);
-        scope.SetTag("byte.offset", offset);
-        scope.SetTag("byte.length", length);
 
         // Hold the gate for the entire request lifetime — including streaming
         // the response body — so a slow consumer cannot allow more than
@@ -506,17 +459,6 @@ internal sealed class S3Backend : IObjectStoreBackend, IDisposable
                 ? resp.ResponseStream
                 : new RateLimitedStream(resp.ResponseStream, downLimiter);
             await source.CopyToAsync(destination, ct).ConfigureAwait(false);
-            // Use the response Content-Length when available so partial-range
-            // reads (e.g. when length runs past EOF) are recorded against the
-            // actual bytes streamed. Fall back to the requested length if the
-            // SDK leaves it unset.
-            var bytes = resp.ContentLength > 0 ? resp.ContentLength : length;
-            OsvfsTelemetry.BytesDownloaded.Add(bytes);
-        }
-        catch (Exception ex)
-        {
-            scope.Fail(ex);
-            throw;
         }
         finally
         {
@@ -532,31 +474,17 @@ internal sealed class S3Backend : IObjectStoreBackend, IDisposable
         CancellationToken ct,
         IReadOnlyDictionary<string, string>? userMetadata = null)
     {
-        using var scope = OsvfsTelemetry.StartS3Operation("S3.Put");
-        scope.SetTag("relative.path", relativePath);
-
         var relKey = KeyPath.ToObjectKey(relativePath);
         if (string.IsNullOrEmpty(relKey))
         {
-            var ex = new ArgumentException("Cannot upload to empty key.", nameof(relativePath));
-            scope.Fail(ex);
-            throw ex;
+            throw new ArgumentException("Cannot upload to empty key.", nameof(relativePath));
         }
 
         // Validate the user-metadata size up front so the operator gets a clear error
         // instead of S3's opaque "metadata headers exceed maximum" 400 at the end of
         // a (potentially multi-GiB) upload.
-        IReadOnlyDictionary<string, string> normalizedMetadata;
-        try
-        {
-            normalizedMetadata = ObjectStore.UserMetadata.Normalize(userMetadata);
-            ObjectStore.UserMetadata.EnsureWithinSizeLimit(normalizedMetadata, UserMetadataMaxBytes);
-        }
-        catch (Exception ex)
-        {
-            scope.Fail(ex);
-            throw;
-        }
+        var normalizedMetadata = ObjectStore.UserMetadata.Normalize(userMetadata);
+        ObjectStore.UserMetadata.EnsureWithinSizeLimit(normalizedMetadata, UserMetadataMaxBytes);
 
         var fullKey = KeyPath.FullKey(keyPrefix, relKey);
         // Wrap the upload payload so the SDK's pulls (single PUT or multipart workers) are
@@ -576,16 +504,9 @@ internal sealed class S3Backend : IObjectStoreBackend, IDisposable
             // and behave differently. Honor IfMatch on the simple path; let TransferUtility
             // handle every other case (it auto-splits at MinSizeBeforePartUpload, parallelizes
             // parts, and aborts cleanly on failure).
-            var result = string.IsNullOrEmpty(ifMatchETag)
+            return string.IsNullOrEmpty(ifMatchETag)
                 ? await MultiPartPutAsync(fullKey, paced, normalizedMetadata, ct).ConfigureAwait(false)
                 : await SinglePutAsync(fullKey, paced, ifMatchETag, normalizedMetadata, ct).ConfigureAwait(false);
-            if (result.Size > 0) OsvfsTelemetry.BytesUploaded.Add(result.Size);
-            return result;
-        }
-        catch (Exception ex)
-        {
-            scope.Fail(ex);
-            throw;
         }
         finally
         {
@@ -697,9 +618,6 @@ internal sealed class S3Backend : IObjectStoreBackend, IDisposable
     /// <inheritdoc/>
     public async Task DeleteAsync(string relativePath, CancellationToken ct)
     {
-        using var scope = OsvfsTelemetry.StartS3Operation("S3.Delete");
-        scope.SetTag("relative.path", relativePath);
-
         var relKey = KeyPath.ToObjectKey(relativePath);
         if (string.IsNullOrEmpty(relKey)) return;
 
@@ -715,19 +633,11 @@ internal sealed class S3Backend : IObjectStoreBackend, IDisposable
         {
             // Already gone — treat as success.
         }
-        catch (Exception ex)
-        {
-            scope.Fail(ex);
-            throw;
-        }
     }
 
     /// <inheritdoc/>
     public async Task DeletePrefixAsync(string relativeDirectory, CancellationToken ct)
     {
-        using var scope = OsvfsTelemetry.StartS3Operation("S3.DeletePrefix");
-        scope.SetTag("relative.directory", relativeDirectory);
-
         var relPrefix = KeyPath.NormalizePrefix(relativeDirectory);
         if (relPrefix.Length == 0) return;
 
@@ -737,24 +647,12 @@ internal sealed class S3Backend : IObjectStoreBackend, IDisposable
             Prefix = keyPrefix + relPrefix,
         };
 
-        try
-        {
-            await BatchDeleteKeysAsync(EnumerateKeysAsync(request, ct), ct).ConfigureAwait(false);
-        }
-        catch (Exception ex)
-        {
-            scope.Fail(ex);
-            throw;
-        }
+        await BatchDeleteKeysAsync(EnumerateKeysAsync(request, ct), ct).ConfigureAwait(false);
     }
 
     /// <inheritdoc/>
     public async Task RenameAsync(string oldRelativePath, string newRelativePath, CancellationToken ct)
     {
-        using var scope = OsvfsTelemetry.StartS3Operation("S3.Rename");
-        scope.SetTag("relative.path.old", oldRelativePath);
-        scope.SetTag("relative.path.new", newRelativePath);
-
         var oldRelKey = KeyPath.ToObjectKey(oldRelativePath);
         var newRelKey = KeyPath.ToObjectKey(newRelativePath);
         if (string.IsNullOrEmpty(oldRelKey) || string.IsNullOrEmpty(newRelKey)) return;
@@ -763,38 +661,26 @@ internal sealed class S3Backend : IObjectStoreBackend, IDisposable
         var oldKey = KeyPath.FullKey(keyPrefix, oldRelKey);
         var newKey = KeyPath.FullKey(keyPrefix, newRelKey);
 
-        try
-        {
-            // Atomic-replace pattern (editor writes to a temp key, then renames it
-            // over an existing target) would otherwise lose the destination's
-            // x-amz-meta-* because the default CopyObject directive copies the
-            // source's (empty) metadata. Carry the destination's existing user
-            // metadata across the replace so the round-trip stays intact.
-            var preservedMetadata = await TryHeadUserMetadataAsync(newKey, ct).ConfigureAwait(false);
+        // Atomic-replace pattern (editor writes to a temp key, then renames it
+        // over an existing target) would otherwise lose the destination's
+        // x-amz-meta-* because the default CopyObject directive copies the
+        // source's (empty) metadata. Carry the destination's existing user
+        // metadata across the replace so the round-trip stays intact.
+        var preservedMetadata = await TryHeadUserMetadataAsync(newKey, ct).ConfigureAwait(false);
 
-            await CopyObjectAsync(oldKey, newKey, ct, preservedMetadata).ConfigureAwait(false);
+        await CopyObjectAsync(oldKey, newKey, ct, preservedMetadata).ConfigureAwait(false);
 
-            await WithRefreshRetryAsync(() => client.DeleteObjectAsync(new DeleteObjectRequest
-            {
-                BucketName = bucketName,
-                Key = oldKey,
-            }, ct)).ConfigureAwait(false);
-        }
-        catch (Exception ex)
+        await WithRefreshRetryAsync(() => client.DeleteObjectAsync(new DeleteObjectRequest
         {
-            scope.Fail(ex);
-            throw;
-        }
+            BucketName = bucketName,
+            Key = oldKey,
+        }, ct)).ConfigureAwait(false);
     }
 
     /// <inheritdoc/>
     public async Task RenamePrefixAsync(
         string oldRelativeDirectory, string newRelativeDirectory, CancellationToken ct)
     {
-        using var scope = OsvfsTelemetry.StartS3Operation("S3.RenamePrefix");
-        scope.SetTag("relative.directory.old", oldRelativeDirectory);
-        scope.SetTag("relative.directory.new", newRelativeDirectory);
-
         var oldRelPrefix = KeyPath.NormalizePrefix(oldRelativeDirectory);
         var newRelPrefix = KeyPath.NormalizePrefix(newRelativeDirectory);
         if (oldRelPrefix.Length == 0 || newRelPrefix.Length == 0) return;
@@ -810,21 +696,13 @@ internal sealed class S3Backend : IObjectStoreBackend, IDisposable
             Prefix = oldFullPrefix,
         };
 
-        try
+        await foreach (var key in EnumerateKeysAsync(request, ct).ConfigureAwait(false))
         {
-            await foreach (var key in EnumerateKeysAsync(request, ct).ConfigureAwait(false))
-            {
-                keys.Add(key);
-                await CopyObjectAsync(key, newFullPrefix + key[oldFullPrefix.Length..], ct).ConfigureAwait(false);
-            }
+            keys.Add(key);
+            await CopyObjectAsync(key, newFullPrefix + key[oldFullPrefix.Length..], ct).ConfigureAwait(false);
+        }
 
-            await BatchDeleteKeysAsync(keys, ct).ConfigureAwait(false);
-        }
-        catch (Exception ex)
-        {
-            scope.Fail(ex);
-            throw;
-        }
+        await BatchDeleteKeysAsync(keys, ct).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -933,8 +811,6 @@ internal sealed class S3Backend : IObjectStoreBackend, IDisposable
     /// <paramref name="metadataOverride"/> is non-null the request switches to
     /// REPLACE so the destination ends up with that exact metadata instead of
     /// inheriting the source's; null leaves the SDK default (COPY from source).
-    /// Wrapped in an <c>S3.Copy</c> scope so the wire-level CopyObject latency
-    /// shows up as a child span when the parent is a Rename.
     /// </summary>
     private async Task<CopyObjectResponse> CopyObjectAsync(
         string sourceKey,
@@ -942,10 +818,6 @@ internal sealed class S3Backend : IObjectStoreBackend, IDisposable
         CancellationToken ct,
         IReadOnlyDictionary<string, string>? metadataOverride = null)
     {
-        using var scope = OsvfsTelemetry.StartS3Operation("S3.Copy");
-        scope.SetTag("source.key", sourceKey);
-        scope.SetTag("destination.key", destinationKey);
-
         var request = new CopyObjectRequest
         {
             SourceBucket = bucketName,
@@ -959,16 +831,8 @@ internal sealed class S3Backend : IObjectStoreBackend, IDisposable
             ApplyUserMetadata(request.Metadata, metadataOverride);
         }
 
-        try
-        {
-            return await WithRefreshRetryAsync(() => client.CopyObjectAsync(request, ct))
-                .ConfigureAwait(false);
-        }
-        catch (Exception ex)
-        {
-            scope.Fail(ex);
-            throw;
-        }
+        return await WithRefreshRetryAsync(() => client.CopyObjectAsync(request, ct))
+            .ConfigureAwait(false);
     }
 
     /// <summary>

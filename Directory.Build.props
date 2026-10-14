@@ -41,7 +41,6 @@
             * AWSSDK.* (S3, SQS, SSO, Core) — IL3058 surfaces because the assemblies
               don't carry the marker; the AOT publish smoke job (#50) confirms the
               binary actually links and runs.
-            * OpenTelemetry.*
             * System.CommandLine
             * Microsoft.Windows.ProjFS / Tomlyn (IL2104 trim warnings)
           Keep them as warnings even when TreatWarningsAsErrors=true so Release builds
