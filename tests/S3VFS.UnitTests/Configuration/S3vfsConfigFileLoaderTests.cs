@@ -24,13 +24,6 @@ public class S3vfsConfigFileLoaderTests
             read-only = true
             sync-interval-seconds = 15
             aws-profile = "prod"
-            bandwidth-up = "5M"
-            bandwidth-down = "10M"
-            multipart-threshold = "16M"
-            multipart-part-size = "32M"
-            max-concurrent-uploads = 6
-            max-concurrent-downloads = 12
-            max-multipart-parts = 20
             log-format = "json"
             """;
 
@@ -48,13 +41,6 @@ public class S3vfsConfigFileLoaderTests
         Assert.True(mount.ReadOnly);
         Assert.Equal(15, mount.SyncIntervalSeconds);
         Assert.Equal("prod", mount.AwsProfile);
-        Assert.Equal("5M", mount.BandwidthUp);
-        Assert.Equal("10M", mount.BandwidthDown);
-        Assert.Equal("16M", mount.MultipartThreshold);
-        Assert.Equal("32M", mount.MultipartPartSize);
-        Assert.Equal(6, mount.MaxConcurrentUploads);
-        Assert.Equal(12, mount.MaxConcurrentDownloads);
-        Assert.Equal(20, mount.MaxMultipartParts);
     }
 
     [Fact]
@@ -100,10 +86,6 @@ public class S3vfsConfigFileLoaderTests
             read_only = true
             sync_interval_seconds = 7
             aws_profile = "p"
-            bandwidth_up = "1M"
-            bandwidth_down = "2M"
-            multipart_threshold = "8M"
-            multipart_part_size = "16M"
             """;
 
         var config = S3vfsConfigFileLoader.ParseContent(toml, "test.toml");
@@ -114,10 +96,6 @@ public class S3vfsConfigFileLoaderTests
         Assert.True(mount.ReadOnly);
         Assert.Equal(7, mount.SyncIntervalSeconds);
         Assert.Equal("p", mount.AwsProfile);
-        Assert.Equal("1M", mount.BandwidthUp);
-        Assert.Equal("2M", mount.BandwidthDown);
-        Assert.Equal("8M", mount.MultipartThreshold);
-        Assert.Equal("16M", mount.MultipartPartSize);
     }
 
     [Fact]
@@ -268,60 +246,6 @@ public class S3vfsConfigFileLoaderTests
         var ex = Assert.Throws<S3vfsConfigException>(() =>
             S3vfsConfigFileLoader.ParseContent("retry-max-attempts = \"5\"", "test.toml"));
         Assert.Contains("retry-max-attempts", ex.Message, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void Parse_concurrency_settings_kebab_and_snake_aliases_accepted()
-    {
-        const string kebabToml = """
-            max-concurrent-uploads = 8
-            max-concurrent-downloads = 16
-            max-multipart-parts = 20
-            """;
-        const string snakeToml = """
-            max_concurrent_uploads = 2
-            max_concurrent_downloads = 3
-            max_multipart_parts = 4
-            """;
-
-        var kebab = S3vfsConfigFileLoader.ParseContent(kebabToml, "test.toml");
-        var snake = S3vfsConfigFileLoader.ParseContent(snakeToml, "test.toml");
-
-        var kebabMount = Assert.Single(kebab.Mounts);
-        Assert.Equal(8, kebabMount.MaxConcurrentUploads);
-        Assert.Equal(16, kebabMount.MaxConcurrentDownloads);
-        Assert.Equal(20, kebabMount.MaxMultipartParts);
-
-        var snakeMount = Assert.Single(snake.Mounts);
-        Assert.Equal(2, snakeMount.MaxConcurrentUploads);
-        Assert.Equal(3, snakeMount.MaxConcurrentDownloads);
-        Assert.Equal(4, snakeMount.MaxMultipartParts);
-    }
-
-    [Fact]
-    public void Parse_concurrency_settings_type_mismatch_throws()
-    {
-        var ex = Assert.Throws<S3vfsConfigException>(() =>
-            S3vfsConfigFileLoader.ParseContent("max-concurrent-uploads = \"4\"", "test.toml"));
-        Assert.Contains("max-concurrent-uploads", ex.Message, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void Parse_concurrency_settings_rejected_at_root_when_mount_array_present()
-    {
-        // Stray top-level concurrency keys mixed with [[mount]] entries are
-        // ambiguous; the loader rejects them rather than silently dropping.
-        const string toml = """
-            max-concurrent-uploads = 4
-
-            [[mount]]
-            name = "a"
-            bucket = "x"
-            root-folder = "C:/x"
-            """;
-        var ex = Assert.Throws<S3vfsConfigException>(() =>
-            S3vfsConfigFileLoader.ParseContent(toml, "test.toml"));
-        Assert.Contains("max-concurrent-uploads", ex.Message, StringComparison.Ordinal);
     }
 
     [Fact]

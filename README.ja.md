@@ -66,10 +66,7 @@ S3 互換サービスはサポート対象外です。
 詳細リファレンスは [`docs/`](docs/) 配下のトピック別ページに分割しています。
 
 - **[設定](docs/configuration.ja.md)** — 必要環境、CLI 表面、`s3vfs.toml`
-  全キーリファレンス、マルチマウントの書式。
-- **[パフォーマンスチューニング](docs/tuning.ja.md)** — 帯域制御、
-  multipart のしきい値、リクエスト並列度、HTTP トランスポート、
-  リトライポリシー。
+  全キーリファレンス、マルチマウントの書式、リトライポリシー。
 - **[同期と変更イベント](docs/sync-and-events.ja.md)** — ポーリング /
   push モードの変更検出、オンデマンド同期、読み取り専用マウント、
   SQS の構成。
@@ -147,9 +144,8 @@ Microsoft が OS 標準で提供している ProjFS フィルタードライバ�
   [`IObjectStoreBackend`](src/S3VFS.Core/ObjectStore/IObjectStoreBackend.cs)
   の背後に置き、ProjFS プロバイダーが必要とする最小限の API (list / head /
   range read / upload / delete / copy ベースの rename) にラップします。
-  `multipart-threshold` (既定 16 MiB) 以上のアップロードは `TransferUtility`
-  経由で `multipart-part-size` (既定 5 MiB) のパートに分割して並列アップロード
-  されます。クロスプラットフォームな Core ライブラリに
+  アップロードは `TransferUtility` を経由し、大きなファイルは AWS SDK の
+  既定値でマルチパートアップロードされます。クロスプラットフォームな Core ライブラリに
   置かれているため、Linux 上の LocalStack に対するインテグレーションテスト
   から ProjFS バインディング無しで利用できます。`prefix` を指定した場合、
   バックエンドは仮想化ルートからの相対パスを `<prefix>/<path>` の形でフル

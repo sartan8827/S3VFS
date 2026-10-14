@@ -2,7 +2,6 @@ using Amazon.Runtime;
 using Amazon.S3;
 using Amazon.S3.Model;
 using Amazon.S3.Transfer;
-using S3VFS.Net;
 using System.Net;
 using System.Runtime.CompilerServices;
 
@@ -21,39 +20,6 @@ internal sealed class S3Backend : IObjectStoreBackend, IDisposable
     private const int DeleteBatchLimit = 1000;
 
     /// <summary>
-    /// Default for streams routed through TransferUtility's multipart path.
-    /// Mirrors the AWS SDK v4 default for
-    /// <see cref="TransferUtilityConfig.MinSizeBeforePartUpload"/> (16 MB) so
-    /// the S3VFS behavior matches what an operator would expect from reading
-    /// the SDK docs. Used when the host does not pass an explicit override.
-    /// </summary>
-    public const long DefaultMultipartThresholdBytes = 16L * 1024 * 1024;
-
-    /// <summary>
-    /// Default per-part size for multipart uploads (5 MiB — the S3 minimum). Used
-    /// when the host does not pass an explicit override.
-    /// </summary>
-    public const long DefaultMultipartPartSizeBytes = 5L * 1024 * 1024;
-
-    /// <summary>
-    /// Smallest per-part size accepted by S3. Parts smaller than this fail the
-    /// CompleteMultipartUpload call (the last part is exempt).
-    /// </summary>
-    public const long MinMultipartPartSizeBytes = 5L * 1024 * 1024;
-
-    /// <summary>
-    /// Largest per-part size accepted by S3. Parts above this exceed the
-    /// single-part 5 GiB ceiling.
-    /// </summary>
-    public const long MaxMultipartPartSizeBytes = 5L * 1024 * 1024 * 1024;
-
-    /// <summary>
-    /// Hard cap on the number of parts a single multipart upload may have. S3
-    /// rejects uploads with more parts at CompleteMultipartUpload.
-    /// </summary>
-    public const int MaxMultipartPartCount = 10_000;
-
-    /// <summary>
     /// Combined UTF-8 byte limit for user-defined metadata names+values
     /// enforced by S3 (<c>x-amz-meta-*</c> headers): 2 KiB per object.
     /// </summary>
@@ -63,29 +29,9 @@ internal sealed class S3Backend : IObjectStoreBackend, IDisposable
 
     private readonly string keyPrefix;
 
-    private readonly long multipartPartSize;
-
     private readonly AmazonS3Client client;
 
     private readonly TransferUtility transferUtility;
-
-    /// <summary>
-    /// Shared HTTP client factory that owns the tuned
-    /// <see cref="System.Net.Http.SocketsHttpHandler"/> threaded into the SDK.
-    /// Disposed when the backend is disposed so its <c>HttpClient</c> tears
-    /// down with the rest of the backend.
-    /// </summary>
-    private readonly S3vfsHttpClientFactory httpClientFactory;
-
-    /// <summary>
-    /// Optional throttle applied to upload payload streams. Owned by the backend.
-    /// </summary>
-    private readonly IRateLimiter? upLimiter;
-
-    /// <summary>
-    /// Optional throttle applied to download response streams. Owned by the backend.
-    /// </summary>
-    private readonly IRateLimiter? downLimiter;
 
     /// <summary>
     /// Reference to the SDK's refreshing credentials wrapper when the supplied
@@ -112,97 +58,18 @@ internal sealed class S3Backend : IObjectStoreBackend, IDisposable
     private readonly string? credentialDescription;
 
     /// <summary>
-    /// Caps the number of concurrent <see cref="UploadAsync"/> calls. Acquired
-    /// at the entry of each upload and released after the upload completes
-    /// (success or failure). One permit corresponds to one upload regardless
-    /// of how many multipart parts the SDK fans the upload into; multipart
-    /// part parallelism is governed by
-    /// <see cref="TransferUtilityConfig.ConcurrentServiceRequests"/>.
-    /// </summary>
-    private readonly SemaphoreSlim uploadGate;
-
-    /// <summary>
-    /// Caps the number of concurrent <see cref="ReadRangeAsync"/> calls.
-    /// Acquired before issuing the GetObject request and released after the
-    /// response stream finishes copying.
-    /// </summary>
-    private readonly SemaphoreSlim downloadGate;
-
-    /// <summary>
-    /// Configured ceiling on in-flight upload API calls; exposed for
-    /// observability tests so they can assert on
-    /// <see cref="SemaphoreSlim.CurrentCount"/> against a known capacity.
-    /// </summary>
-    public int MaxConcurrentUploads => maxConcurrentUploads;
-    private readonly int maxConcurrentUploads;
-
-    /// <summary>
-    /// Configured ceiling on in-flight download API calls; exposed for the
-    /// same reason as <see cref="MaxConcurrentUploads"/>.
-    /// </summary>
-    public int MaxConcurrentDownloads => maxConcurrentDownloads;
-    private readonly int maxConcurrentDownloads;
-
-    /// <summary>
-    /// Snapshot of the upload semaphore's current free permits. Used by
-    /// concurrency tests to confirm the gate is acquired/released around
-    /// each <see cref="UploadAsync"/> call. <see cref="SemaphoreSlim.CurrentCount"/>
-    /// returns the available count, so the in-flight count is
-    /// <see cref="MaxConcurrentUploads"/> minus this value.
-    /// </summary>
-    public int CurrentUploadPermits => uploadGate.CurrentCount;
-
-    /// <summary>
-    /// Snapshot of the download semaphore's current free permits. Counterpart
-    /// to <see cref="CurrentUploadPermits"/>.
-    /// </summary>
-    public int CurrentDownloadPermits => downloadGate.CurrentCount;
-
-    /// <summary>
     /// Default attempt count when the host does not pass an explicit override.
     /// Matches the SDK's historical default (one initial attempt + two retries).
     /// </summary>
     public const int DefaultRetryMaxAttempts = 3;
 
     /// <summary>
-    /// Default ceiling on in-flight upload API calls when the host does not
-    /// pass an explicit override. One <c>UploadAsync</c> call counts as a
-    /// single in-flight upload regardless of how many multipart parts it
-    /// fans out into; per-part parallelism is governed separately by
-    /// <see cref="DefaultMaxMultipartParts"/>.
-    /// </summary>
-    public const int DefaultMaxConcurrentUploads = 4;
-
-    /// <summary>
-    /// Default ceiling on in-flight download API calls when the host does
-    /// not pass an explicit override. Each <c>ReadRangeAsync</c> call counts
-    /// as one in-flight download.
-    /// </summary>
-    public const int DefaultMaxConcurrentDownloads = 8;
-
-    /// <summary>
-    /// Default per-upload multipart-part parallelism when the host does not
-    /// pass an explicit override. Threaded through to
-    /// <see cref="TransferUtilityConfig.ConcurrentServiceRequests"/>.
-    /// </summary>
-    public const int DefaultMaxMultipartParts = 10;
-
-    /// <summary>
     /// Creates a backend bound to <paramref name="bucketName"/>. <paramref name="endpointUrl"/>
     /// switches the client into path-style addressing (LocalStack/MinIO); <paramref name="region"/>
     /// drives request signing; <paramref name="credentials"/> short-circuits the SDK chain.
-    /// <paramref name="upLimiter"/> / <paramref name="downLimiter"/> apply per-direction
-    /// bandwidth ceilings; either may be null to disable that direction.
-    /// <paramref name="multipartThresholdBytes"/> / <paramref name="multipartPartSizeBytes"/>
-    /// override the multipart routing knobs; null falls back to the defaults.
     /// <paramref name="retryMaxAttempts"/> sets the total attempt count the SDK
     /// will make for transient failures (initial + retries). Null falls back to
     /// <see cref="DefaultRetryMaxAttempts"/>; <c>1</c> disables retries.
-    /// <paramref name="maxConcurrentUploads"/> / <paramref name="maxConcurrentDownloads"/>
-    /// cap in-flight API calls per direction; null falls back to
-    /// <see cref="DefaultMaxConcurrentUploads"/> / <see cref="DefaultMaxConcurrentDownloads"/>.
-    /// <paramref name="maxMultipartParts"/> caps multipart-part parallelism
-    /// inside a single upload; null falls back to <see cref="DefaultMaxMultipartParts"/>.
     /// <paramref name="refreshNotifier"/> receives ExpiredToken-driven refresh
     /// outcomes; null disables notifications (everything still gets logged at
     /// the SDK level).
@@ -213,30 +80,14 @@ internal sealed class S3Backend : IObjectStoreBackend, IDisposable
         string? keyPrefix = null,
         string? region = null,
         AwsCredentialSource? credentials = null,
-        IRateLimiter? upLimiter = null,
-        IRateLimiter? downLimiter = null,
-        long? multipartThresholdBytes = null,
-        long? multipartPartSizeBytes = null,
         int? retryMaxAttempts = null,
-        int? maxConcurrentUploads = null,
-        int? maxConcurrentDownloads = null,
-        int? maxMultipartParts = null,
         ICredentialRefreshNotifier? refreshNotifier = null)
     {
         this.bucketName = bucketName;
         this.keyPrefix = KeyPath.NormalizeKeyPrefix(keyPrefix);
-        this.upLimiter = upLimiter;
-        this.downLimiter = downLimiter;
         this.refreshNotifier = refreshNotifier;
         credentialDescription = credentials?.Description;
-        var threshold = multipartThresholdBytes ?? DefaultMultipartThresholdBytes;
-        multipartPartSize = multipartPartSizeBytes ?? DefaultMultipartPartSizeBytes;
         var attempts = retryMaxAttempts ?? DefaultRetryMaxAttempts;
-        this.maxConcurrentUploads = Math.Max(1, maxConcurrentUploads ?? DefaultMaxConcurrentUploads);
-        this.maxConcurrentDownloads = Math.Max(1, maxConcurrentDownloads ?? DefaultMaxConcurrentDownloads);
-        var multipartParts = Math.Max(1, maxMultipartParts ?? DefaultMaxMultipartParts);
-        uploadGate = new SemaphoreSlim(this.maxConcurrentUploads, this.maxConcurrentUploads);
-        downloadGate = new SemaphoreSlim(this.maxConcurrentDownloads, this.maxConcurrentDownloads);
         // Materialize once so the same AWSCredentials instance feeds both the
         // SDK client AND the ExpiredToken retry helper. SDK-issued refreshing
         // credentials (SSO, credential_process, AssumeRole, …) all derive
@@ -244,48 +95,20 @@ internal sealed class S3Backend : IObjectStoreBackend, IDisposable
         // so we can force a re-fetch from outside the SDK pipeline.
         var awsCredentials = credentials?.Materialize();
         refreshableCredentials = awsCredentials as RefreshingAWSCredentials;
-        // Cap the SDK's connection pool so the per-direction gates above are
-        // the binding constraint rather than the HTTP layer running out of
-        // connections under burst load. Multiplying by 2 leaves headroom for
-        // the SDK's own bookkeeping requests (HEAD before PUT, list pages
-        // during reconcile, …) that don't go through the upload/download gates.
-        var maxConnections = Math.Max(this.maxConcurrentUploads, this.maxConcurrentDownloads) * 2;
-        // Build the factory before the client so the SDK picks it up via
-        // AmazonS3Config.HttpClientFactory. Endpoint overrides
-        // (LocalStack / MinIO) get HTTP/2 promotion disabled because those
-        // servers commonly speak only HTTP/1.1 and the negotiation overhead
-        // is wasted there.
-        httpClientFactory = new S3vfsHttpClientFactory(
-            maxConnectionsPerServer: maxConnections,
-            enableHttp2: string.IsNullOrEmpty(endpointUrl));
-        client = CreateClient(endpointUrl, region, awsCredentials, attempts, maxConnections, httpClientFactory);
+        client = CreateClient(endpointUrl, region, awsCredentials, attempts);
         // Share a single TransferUtility per backend: it's documented thread-safe, holds no
         // upload-specific state, and disposes only its internally-created client (not ours).
-        // ConcurrentServiceRequests caps the parts uploaded in parallel within a single
-        // multipart upload — orthogonal to uploadGate, which caps the number of distinct
-        // upload calls in flight at once.
-        transferUtility = new TransferUtility(client, new TransferUtilityConfig
-        {
-            MinSizeBeforePartUpload = threshold,
-            ConcurrentServiceRequests = multipartParts,
-        });
+        // Multipart threshold, part size, and part parallelism use the SDK defaults.
+        transferUtility = new TransferUtility(client);
     }
 
     /// <summary>
-    /// Disposes the shared TransferUtility, underlying S3 client, and any limiters
-    /// the backend owns.
+    /// Disposes the shared TransferUtility and the underlying S3 client.
     /// </summary>
     public void Dispose()
     {
         transferUtility.Dispose();
         client.Dispose();
-        // Dispose the factory after the SDK client so any in-flight SDK
-        // teardown that touches the HttpClient sees a live instance.
-        httpClientFactory.Dispose();
-        (upLimiter as IDisposable)?.Dispose();
-        (downLimiter as IDisposable)?.Dispose();
-        uploadGate.Dispose();
-        downloadGate.Dispose();
     }
 
     /// <inheritdoc/>
@@ -441,29 +264,13 @@ internal sealed class S3Backend : IObjectStoreBackend, IDisposable
     {
         if (length == 0) return;
 
-        // Hold the gate for the entire request lifetime — including streaming
-        // the response body — so a slow consumer cannot allow more than
-        // maxConcurrentDownloads readers to share the SDK's HTTP pool.
-        await downloadGate.WaitAsync(ct).ConfigureAwait(false);
-        try
+        using var resp = await WithRefreshRetryAsync(() => client.GetObjectAsync(new GetObjectRequest
         {
-            using var resp = await WithRefreshRetryAsync(() => client.GetObjectAsync(new GetObjectRequest
-            {
-                BucketName = bucketName,
-                Key = KeyPath.FullKey(keyPrefix, KeyPath.ToObjectKey(relativePath)),
-                ByteRange = new ByteRange(offset, offset + length - 1),
-            }, ct)).ConfigureAwait(false);
-            // Wrap the response body in a rate-limited view when a download ceiling is configured;
-            // CopyToAsync then only pulls bytes as fast as the limiter releases them.
-            var source = downLimiter is null
-                ? resp.ResponseStream
-                : new RateLimitedStream(resp.ResponseStream, downLimiter);
-            await source.CopyToAsync(destination, ct).ConfigureAwait(false);
-        }
-        finally
-        {
-            downloadGate.Release();
-        }
+            BucketName = bucketName,
+            Key = KeyPath.FullKey(keyPrefix, KeyPath.ToObjectKey(relativePath)),
+            ByteRange = new ByteRange(offset, offset + length - 1),
+        }, ct)).ConfigureAwait(false);
+        await resp.ResponseStream.CopyToAsync(destination, ct).ConfigureAwait(false);
     }
 
     /// <inheritdoc/>
@@ -487,31 +294,14 @@ internal sealed class S3Backend : IObjectStoreBackend, IDisposable
         ObjectStore.UserMetadata.EnsureWithinSizeLimit(normalizedMetadata, UserMetadataMaxBytes);
 
         var fullKey = KeyPath.FullKey(keyPrefix, relKey);
-        // Wrap the upload payload so the SDK's pulls (single PUT or multipart workers) are
-        // paced by the shared limiter. The wrapper preserves CanSeek/Length, so TransferUtility
-        // can still pick the multipart vs single-PUT path correctly.
-        var paced = upLimiter is null ? content : new RateLimitedStream(content, upLimiter);
 
-        // Hold the upload gate around the full upload (single-PUT or
-        // TransferUtility-driven multipart). Each call costs one permit
-        // regardless of how many parts the SDK ends up issuing — multipart
-        // part parallelism is bounded separately by the TransferUtility's
-        // ConcurrentServiceRequests.
-        await uploadGate.WaitAsync(ct).ConfigureAwait(false);
-        try
-        {
-            // IfMatch lives on PutObject; on a multipart upload preconditions move to Complete
-            // and behave differently. Honor IfMatch on the simple path; let TransferUtility
-            // handle every other case (it auto-splits at MinSizeBeforePartUpload, parallelizes
-            // parts, and aborts cleanly on failure).
-            return string.IsNullOrEmpty(ifMatchETag)
-                ? await MultiPartPutAsync(fullKey, paced, normalizedMetadata, ct).ConfigureAwait(false)
-                : await SinglePutAsync(fullKey, paced, ifMatchETag, normalizedMetadata, ct).ConfigureAwait(false);
-        }
-        finally
-        {
-            uploadGate.Release();
-        }
+        // IfMatch lives on PutObject; on a multipart upload preconditions move to Complete
+        // and behave differently. Honor IfMatch on the simple path; let TransferUtility
+        // handle every other case (it auto-splits at MinSizeBeforePartUpload, parallelizes
+        // parts, and aborts cleanly on failure).
+        return string.IsNullOrEmpty(ifMatchETag)
+            ? await MultiPartPutAsync(fullKey, content, normalizedMetadata, ct).ConfigureAwait(false)
+            : await SinglePutAsync(fullKey, content, ifMatchETag, normalizedMetadata, ct).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -560,7 +350,6 @@ internal sealed class S3Backend : IObjectStoreBackend, IDisposable
             Key = key,
             InputStream = content,
             AutoCloseStream = false,
-            PartSize = multipartPartSize,
         };
         ApplyUserMetadata(request.Metadata, userMetadata);
 
@@ -928,9 +717,7 @@ internal sealed class S3Backend : IObjectStoreBackend, IDisposable
         string? endpointUrl,
         string? region,
         AWSCredentials? credentials,
-        int retryMaxAttempts,
-        int maxConnectionsPerServer,
-        S3vfsHttpClientFactory httpClientFactory)
+        int retryMaxAttempts)
     {
         var config = new AmazonS3Config
         {
@@ -943,16 +730,6 @@ internal sealed class S3Backend : IObjectStoreBackend, IDisposable
             // budget (initial + retries) is MaxErrorRetry + 1. Clamp to >= 0 so a caller
             // passing 1 (= retries disabled) cannot underflow the SDK's expected range.
             MaxErrorRetry = Math.Max(0, retryMaxAttempts - 1),
-            // Cap the SDK's per-host HTTP connection pool. Sized off the
-            // configured upload/download ceilings so the gates are the binding
-            // constraint, not connection exhaustion. The same value is also
-            // baked into the SocketsHttpHandler the factory hands out.
-            MaxConnectionsPerServer = maxConnectionsPerServer,
-            // Route HttpClient creation through the S3VFS factory so the SDK
-            // picks up the tuned SocketsHttpHandler (Keep-Alive lifetime,
-            // pooled-idle timeout, multiple-HTTP/2 connections) rather than
-            // the SDK's default handler.
-            HttpClientFactory = httpClientFactory,
         };
         if (!string.IsNullOrEmpty(endpointUrl))
         {

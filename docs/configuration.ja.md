@@ -3,7 +3,7 @@
 [← README に戻る](../README.ja.md) · [English](./configuration.md)
 
 S3VFS の必要環境、マウントの起動方法、CLI の最小表面、TOML 設定ファイルの
-全キーリファレンス (マルチマウント含む) をまとめます。AWS 認証情報の
+全キーリファレンス (マルチマウント含む)、リトライポリシーをまとめます。AWS 認証情報の
 解決方法は [認証とクレデンシャル](./credentials.ja.md) を参照してください。
 
 ---
@@ -82,7 +82,7 @@ s3vfs mount --name personal      # 名前指定で 1 つだけ起動
 ## コマンドラインの構成
 
 S3VFS は意図的に**設定ファイル駆動**です。各マウントの設定 (`bucket` /
-`root-folder` / `region` / `aws-profile` / `bandwidth-up` /
+`root-folder` / `region` / `aws-profile` /
 `retry-max-attempts` …) はすべて `s3vfs.toml` のみで管理します。CLI が
 受け付けるのは次の 3 つだけです。
 
@@ -125,14 +125,7 @@ endpoint-url         = "http://localhost:4566"   # 任意
 region               = "ap-northeast-1"          # 任意
 prefix               = "team-a/"                 # 任意
 aws-profile          = "prod"                    # 任意
-bandwidth-up         = "5M"                      # 任意。"0" / 省略で無制限
-bandwidth-down       = "10M"                     # 任意。"0" / 省略で無制限
-multipart-threshold  = "16M"                     # 任意。既定 16 MiB (AWS SDK v4 既定値)
-multipart-part-size  = "16M"                     # 任意。5M〜5G
 retry-max-attempts   = 3                         # 任意。1 でリトライ無効
-max-concurrent-uploads   = 4                     # 任意。同時 UploadAsync 呼び出し数
-max-concurrent-downloads = 8                     # 任意。同時 ReadRangeAsync 呼び出し数
-max-multipart-parts      = 10                    # 任意。1 アップロードあたりの並列パート数
 log-format           = "text"                    # 任意。"text" または "json"
 allow-unversioned    = false                     # DANGER: バージョニング安全チェックをスキップ
 verbose              = false
@@ -201,3 +194,34 @@ s3vfs mount --name work         # 同じ設定ファイル内の別マウント�
 `S3VFS.Mount.<name>` カテゴリに分類されるので text / JSON フォーマット
 のいずれでもマウント名で識別できます。ホストプロセスで Enter を押すと
 逐次逆順 (最後に起動したマウントから先に) シャットダウンします。
+
+## リトライポリシー
+
+オブジェクトストアの一時的な失敗は AWS SDK のリトライパイプラインに委
+ねており、S3VFS は `RetryMode.Adaptive` (標準の指数バックオフに加えて、
+サービスが過負荷を返した際に後続リクエストを抑止するクライアントサイド
+スロットリング用トークンバケット) と `MaxErrorRetry = retry-max-attempts − 1`
+を設定します。リトライ対象のエラー分類は SDK 組み込みのものを利用しま
+す。
+
+| エラー | リトライ対象? | 補足 |
+| --- | --- | --- |
+| HTTP 5xx (`500`, `502`, `503`, `504` …) | はい | サーバ / ロードバランサ側エラー。SDK が一時的とみなす |
+| HTTP 408 `Request Timeout` | はい | サーバ側タイムアウト。SDK がバックオフ付きでリトライ |
+| `Throttling` / `ThrottlingException` / `RequestThrottled*` / `TooManyRequestsException` / `ProvisionedThroughputExceededException` / `RequestLimitExceeded` / `SlowDown` | はい | AWS のスロットリング系エラー。Adaptive モードは続くリクエストもトークンバケットで抑止 |
+| `RequestTimeout` / ネットワークエラー / 接続切断 | はい | ローカルのソケット / コネクションエラー |
+| HTTP 4xx (408 を除く `400`, `401`, `403`, `404`, `409`, `412` …) | いいえ | 呼び出し側起因のエラー (不正リクエスト / 権限不足 / 未存在)。即座に伝播 |
+| `OperationCanceledException` / `TaskCanceledException` | いいえ | キャンセルはリトライせずに伝播 |
+
+スケジュールは SDK 側が所有しています: `MaxErrorRetry` 回までジッタ付き
+の指数バックオフでリトライします。`retry-max-attempts = 1` を指定すると
+SDK のリトライは 0 回になり、初回呼び出しのみが実行されます。SDK の
+`TransferUtility` はマルチパートアップロードの個別パートを内部でリトラ
+イするため、`retry-max-attempts = 3` 設定でも数 GiB のアップロード全体
+を再送せずに済みます (失敗したパートだけ最大 3 回まで再送)。
+
+```toml
+bucket             = "my-bucket"
+root-folder        = "C:/Users/you/S3VFS"
+retry-max-attempts = 5         # 試行回数 5 回 (初回 1 + リトライ 4)
+```

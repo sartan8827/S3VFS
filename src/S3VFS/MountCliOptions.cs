@@ -5,7 +5,7 @@ namespace S3VFS;
 
 /// <summary>
 /// Process-level CLI flags shared between the root command and <c>mount</c>.
-/// Per-mount settings (bucket, region, bandwidth limits, …)
+/// Per-mount settings (bucket, region, retry policy, …)
 /// are configured exclusively through <c>s3vfs.toml</c> /
 /// <c>%APPDATA%\S3VFS\config.toml</c>; only these few flags survive on the
 /// command line because they are useful as one-off overrides during
