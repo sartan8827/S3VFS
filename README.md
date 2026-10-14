@@ -63,11 +63,8 @@ The detailed reference is split into focused pages under
 [`docs/`](docs/):
 
 - **[Configuration](docs/configuration.md)** — prerequisites, the small
-  CLI surface, the full `s3vfs.toml` key reference, and the multi-mount
-  layout.
-- **[Performance tuning](docs/tuning.md)** — bandwidth ceilings,
-  multipart upload thresholds, request concurrency, the HTTP transport,
-  and retry policy.
+  CLI surface, the full `s3vfs.toml` key reference, the multi-mount
+  layout, and the retry policy.
 - **[Synchronization and change events](docs/sync-and-events.md)** —
   polling vs. push-mode change detection, on-demand sync, read-only
   mounts, and SQS setup.
@@ -145,10 +142,9 @@ Roughly:
 - [`S3Backend`](src/S3VFS.Core/ObjectStore/S3/S3Backend.cs) wraps AWSSDK.S3
   behind the [`IObjectStoreBackend`](src/S3VFS.Core/ObjectStore/IObjectStoreBackend.cs)
   with the small, ProjFS-shaped surface the provider needs (list, head,
-  range read, upload, delete, rename-by-copy). Uploads at or above the
-  configured `multipart-threshold` (default 16 MiB) are routed through
-  `TransferUtility` so large files are split into `multipart-part-size`
-  chunks (default 5 MiB) and uploaded in parallel. It lives in a cross-platform Core library so
+  range read, upload, delete, rename-by-copy). Uploads go through
+  `TransferUtility`, which splits large files into multipart uploads using
+  the AWS SDK defaults. It lives in a cross-platform Core library so
   integration tests can run against LocalStack on Linux without pulling in
   the Windows-only ProjFS bindings. When `prefix` is set, the backend
   transparently rewrites virtualization-root-relative paths into the

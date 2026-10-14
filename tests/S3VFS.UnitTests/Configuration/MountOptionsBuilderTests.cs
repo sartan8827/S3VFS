@@ -28,10 +28,6 @@ public class MountOptionsBuilderTests
             SyncIntervalSeconds = 60,
             ChangeSource = ChangeSourceKind.Polling,
             SyncMode = SyncMode.Full,
-            BandwidthUp = "5M",
-            BandwidthDown = "10M",
-            MultipartThreshold = "16M",
-            MultipartPartSize = "16M",
             RetryMaxAttempts = 5,
         };
 
@@ -44,10 +40,6 @@ public class MountOptionsBuilderTests
         Assert.True(options.ReadOnly);
         Assert.Equal(60, options.SyncIntervalSeconds);
         Assert.Equal(SyncMode.Full, options.SyncMode);
-        Assert.Equal(5L * 1024 * 1024, options.BandwidthLimits.UpBytesPerSecond);
-        Assert.Equal(10L * 1024 * 1024, options.BandwidthLimits.DownBytesPerSecond);
-        Assert.Equal(16L * 1024 * 1024, options.MultipartThresholdBytes);
-        Assert.Equal(16L * 1024 * 1024, options.MultipartPartSizeBytes);
         Assert.Equal(5, options.RetryMaxAttempts);
     }
 
@@ -110,76 +102,6 @@ public class MountOptionsBuilderTests
         var ex = Assert.Throws<S3vfsConfigException>(() =>
             MountOptionsBuilder.Build(mount, NullLogger.Instance));
         Assert.Contains("retry-max-attempts", ex.Message, StringComparison.Ordinal);
-    }
-
-    [Theory]
-    [InlineData(0)]
-    [InlineData(-1)]
-    public void Build_throws_when_max_concurrent_uploads_below_one(int value)
-    {
-        var mount = new S3vfsMountConfig
-        {
-            Name = "alpha",
-            Bucket = "alpha-bucket",
-            RootFolder = @"C:\mounts\alpha",
-            MaxConcurrentUploads = value,
-        };
-
-        var ex = Assert.Throws<S3vfsConfigException>(() =>
-            MountOptionsBuilder.Build(mount, NullLogger.Instance));
-        Assert.Contains("max-concurrent-uploads", ex.Message, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void Build_throws_when_max_concurrent_downloads_below_one()
-    {
-        var mount = new S3vfsMountConfig
-        {
-            Name = "alpha",
-            Bucket = "alpha-bucket",
-            RootFolder = @"C:\mounts\alpha",
-            MaxConcurrentDownloads = 0,
-        };
-
-        var ex = Assert.Throws<S3vfsConfigException>(() =>
-            MountOptionsBuilder.Build(mount, NullLogger.Instance));
-        Assert.Contains("max-concurrent-downloads", ex.Message, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void Build_throws_when_max_multipart_parts_below_one()
-    {
-        var mount = new S3vfsMountConfig
-        {
-            Name = "alpha",
-            Bucket = "alpha-bucket",
-            RootFolder = @"C:\mounts\alpha",
-            MaxMultipartParts = 0,
-        };
-
-        var ex = Assert.Throws<S3vfsConfigException>(() =>
-            MountOptionsBuilder.Build(mount, NullLogger.Instance));
-        Assert.Contains("max-multipart-parts", ex.Message, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void Build_threads_concurrency_settings_through_to_options()
-    {
-        var mount = new S3vfsMountConfig
-        {
-            Name = "alpha",
-            Bucket = "alpha-bucket",
-            RootFolder = @"C:\mounts\alpha",
-            MaxConcurrentUploads = 6,
-            MaxConcurrentDownloads = 12,
-            MaxMultipartParts = 20,
-        };
-
-        var options = MountOptionsBuilder.Build(mount, NullLogger.Instance);
-
-        Assert.Equal(6, options.MaxConcurrentUploads);
-        Assert.Equal(12, options.MaxConcurrentDownloads);
-        Assert.Equal(20, options.MaxMultipartParts);
     }
 
     [Fact]

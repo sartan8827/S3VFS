@@ -3,8 +3,8 @@
 [← Back to README](../README.md) · [日本語版](./configuration.ja.md)
 
 This page covers S3VFS prerequisites, how to start a mount, the small CLI
-surface, and the full TOML configuration reference (including the
-multi-mount layout). For AWS credential resolution see
+surface, the full TOML configuration reference (including the
+multi-mount layout), and the retry policy. For AWS credential resolution see
 [Authentication and credentials](./credentials.md).
 
 ---
@@ -80,7 +80,7 @@ Open the configured root folder in Explorer and the bucket contents appear.
 ## Command-line surface
 
 S3VFS is intentionally configuration-driven: every per-mount setting
-(`bucket`, `root-folder`, `region`, `aws-profile`, `bandwidth-up`,
+(`bucket`, `root-folder`, `region`, `aws-profile`,
 `retry-max-attempts`, …) lives only in `s3vfs.toml`. The command line
 exposes just three things:
 
@@ -124,14 +124,7 @@ endpoint-url         = "http://localhost:4566"   # optional
 region               = "ap-northeast-1"          # optional
 prefix               = "team-a/"                 # optional
 aws-profile          = "prod"                    # optional
-bandwidth-up         = "5M"                      # optional, "0" / omit = unlimited
-bandwidth-down       = "10M"                     # optional, "0" / omit = unlimited
-multipart-threshold  = "16M"                     # optional, default 16 MiB (AWS SDK v4 default)
-multipart-part-size  = "16M"                     # optional, 5M..5G
 retry-max-attempts   = 3                         # optional, 1 disables retries
-max-concurrent-uploads   = 4                     # optional, in-flight UploadAsync calls
-max-concurrent-downloads = 8                     # optional, in-flight ReadRangeAsync calls
-max-multipart-parts      = 10                    # optional, parallel parts per upload
 log-format           = "text"                    # optional, "text" or "json"
 allow-unversioned    = false                     # DANGER: skip the bucket-versioning safety check
 verbose              = false
@@ -201,3 +194,33 @@ the `S3VFS.Mount.<name>` category so text / JSON formatters surface which
 mount each line came from. Pressing Enter on the host process disposes
 every mount in reverse start order.
 
+## Retry policy
+
+Transient object-store failures are retried by the AWS SDK pipeline. S3VFS
+configures the client with `RetryMode.Adaptive` (the SDK's adaptive
+client-side throttling, which combines the standard exponential backoff with
+a token bucket that suppresses request bursts when the service signals
+overload) and `MaxErrorRetry = retry-max-attempts − 1`. The SDK's built-in
+retry classifier decides which failures are eligible:
+
+| Failure | Retried? | Notes |
+| --- | --- | --- |
+| HTTP 5xx (`500`, `502`, `503`, `504`, …) | Yes | Server-side / load-balancer errors. Treated as transient by the SDK. |
+| HTTP 408 `Request Timeout` | Yes | Server-side timeout; the SDK retries with backoff. |
+| `Throttling` / `ThrottlingException` / `RequestThrottled*` / `TooManyRequestsException` / `ProvisionedThroughputExceededException` / `RequestLimitExceeded` / `SlowDown` | Yes | AWS throttling family. Adaptive mode also slows the next request via the token bucket. |
+| `RequestTimeout` / network errors / connection resets | Yes | Local socket / connection errors. |
+| HTTP 4xx other than 408 (`400`, `401`, `403`, `404`, `409`, `412`, …) | No | Caller-side errors (bad request, missing object, permissions). Surfaced immediately. |
+| `OperationCanceledException` / `TaskCanceledException` | No | Cancellation propagates without retry. |
+
+The schedule is owned by the SDK: it uses exponential backoff with jitter
+inside `MaxErrorRetry` retries. When `retry-max-attempts` is `1` the SDK
+performs zero retries (the first attempt is the only one). The SDK's
+`TransferUtility` retries individual multipart parts on its own — under
+`retry-max-attempts = 3` a single failing part can be re-uploaded up to
+three times without restarting the whole multi-GiB upload.
+
+```toml
+bucket             = "my-bucket"
+root-folder        = "C:/Users/you/S3VFS"
+retry-max-attempts = 5         # 5 total attempts (1 initial + 4 retries)
+```

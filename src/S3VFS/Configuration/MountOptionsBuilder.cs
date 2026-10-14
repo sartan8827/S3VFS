@@ -1,5 +1,4 @@
 using Microsoft.Extensions.Logging;
-using S3VFS.Net;
 using S3VFS.ObjectStore;
 
 namespace S3VFS.Configuration;
@@ -17,7 +16,7 @@ internal static class MountOptionsBuilder
     /// Builds and validates the runtime options for a single mount. Throws
     /// <see cref="S3vfsConfigException"/> when a required field
     /// (<c>bucket</c> / <c>root-folder</c>) is missing, when a referenced AWS
-    /// profile cannot be resolved, or when bandwidth / multipart / retry
+    /// profile cannot be resolved, or when the retry / event-queue
     /// values fail their bounds checks. The supplied <paramref name="logger"/>
     /// is used only for the "using AWS credentials from profile X" notice.
     /// </summary>
@@ -54,54 +53,11 @@ internal static class MountOptionsBuilder
         var credentials = ResolveCredential(
             sharedProfileResolver, mount.AwsProfile, mount.Name, logger);
 
-        BandwidthLimits bandwidthLimits;
-        long? multipartThresholdBytes;
-        long? multipartPartSizeBytes;
-        try
-        {
-            bandwidthLimits = new BandwidthLimits(
-                UpBytesPerSecond: BandwidthSize.Parse(mount.BandwidthUp),
-                DownBytesPerSecond: BandwidthSize.Parse(mount.BandwidthDown));
-            multipartThresholdBytes = BandwidthSize.Parse(mount.MultipartThreshold);
-            multipartPartSizeBytes = BandwidthSize.Parse(mount.MultipartPartSize);
-        }
-        catch (FormatException ex)
-        {
-            throw new S3vfsConfigException($"Mount '{mount.Name}': {ex.Message}", ex);
-        }
-
-        if (MultipartSettingsValidator.Validate(
-                multipartThresholdBytes, multipartPartSizeBytes) is { } error)
-        {
-            throw new S3vfsConfigException($"Mount '{mount.Name}': {error}");
-        }
-
         if (mount.RetryMaxAttempts is < 1)
         {
             throw new S3vfsConfigException(
                 $"Mount '{mount.Name}': 'retry-max-attempts' must be at least 1 " +
                 $"(got {mount.RetryMaxAttempts}).");
-        }
-
-        if (mount.MaxConcurrentUploads is < 1)
-        {
-            throw new S3vfsConfigException(
-                $"Mount '{mount.Name}': 'max-concurrent-uploads' must be at least 1 " +
-                $"(got {mount.MaxConcurrentUploads}).");
-        }
-
-        if (mount.MaxConcurrentDownloads is < 1)
-        {
-            throw new S3vfsConfigException(
-                $"Mount '{mount.Name}': 'max-concurrent-downloads' must be at least 1 " +
-                $"(got {mount.MaxConcurrentDownloads}).");
-        }
-
-        if (mount.MaxMultipartParts is < 1)
-        {
-            throw new S3vfsConfigException(
-                $"Mount '{mount.Name}': 'max-multipart-parts' must be at least 1 " +
-                $"(got {mount.MaxMultipartParts}).");
         }
 
         var changeSource = mount.ChangeSource ?? ChangeSourceKind.Polling;
@@ -128,13 +84,7 @@ internal static class MountOptionsBuilder
             SyncMode = mount.SyncMode ?? SyncMode.OnDemand,
             EventQueue = mount.EventQueue,
             Credentials = credentials,
-            BandwidthLimits = bandwidthLimits,
-            MultipartThresholdBytes = multipartThresholdBytes,
-            MultipartPartSizeBytes = multipartPartSizeBytes,
             RetryMaxAttempts = mount.RetryMaxAttempts,
-            MaxConcurrentUploads = mount.MaxConcurrentUploads,
-            MaxConcurrentDownloads = mount.MaxConcurrentDownloads,
-            MaxMultipartParts = mount.MaxMultipartParts,
             AllowUnversioned = mount.AllowUnversioned ?? false,
             RefreshNotifier = refreshNotifier,
         };

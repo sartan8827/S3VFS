@@ -1,5 +1,4 @@
 using S3VFS.Configuration;
-using S3VFS.Net;
 using S3VFS.ObjectStore;
 using S3VFS.ObjectStore.S3;
 
@@ -81,50 +80,11 @@ internal sealed record ProjFsProviderOptions
     public AwsCredentialSource? Credentials { get; init; }
 
     /// <summary>
-    /// Optional per-direction bandwidth ceilings. Each component null means
-    /// "no limit on that direction".
-    /// </summary>
-    public BandwidthLimits BandwidthLimits { get; init; }
-
-    /// <summary>
-    /// Stream size at or above which uploads are routed through the multipart path.
-    /// Null falls back to the backend default.
-    /// </summary>
-    public long? MultipartThresholdBytes { get; init; }
-
-    /// <summary>
-    /// Per-part size used by the multipart upload path. Null falls back to the backend default.
-    /// </summary>
-    public long? MultipartPartSizeBytes { get; init; }
-
-    /// <summary>
     /// Total attempts (initial + retries) the AWS SDK makes on transient
     /// failures. Null falls back to the backend default; <c>1</c> disables
     /// retries.
     /// </summary>
     public int? RetryMaxAttempts { get; init; }
-
-    /// <summary>
-    /// Maximum number of in-flight upload API calls (one per
-    /// <see cref="ObjectStore.IObjectStoreBackend.UploadAsync"/> invocation,
-    /// independent of the multipart parts that single call splits into). Null
-    /// falls back to the backend default.
-    /// </summary>
-    public int? MaxConcurrentUploads { get; init; }
-
-    /// <summary>
-    /// Maximum number of in-flight download API calls (one per
-    /// <see cref="ObjectStore.IObjectStoreBackend.ReadRangeAsync"/>
-    /// invocation). Null falls back to the backend default.
-    /// </summary>
-    public int? MaxConcurrentDownloads { get; init; }
-
-    /// <summary>
-    /// Maximum number of multipart parts uploaded in parallel inside a single
-    /// upload. Threaded through to <see cref="Amazon.S3.Transfer.TransferUtilityConfig.ConcurrentServiceRequests"/>.
-    /// Null falls back to the backend default.
-    /// </summary>
-    public int? MaxMultipartParts { get; init; }
 
     /// <summary>
     /// When true, skip the bucket-versioning safety check and instead emit a
@@ -143,8 +103,7 @@ internal sealed record ProjFsProviderOptions
     public ICredentialRefreshNotifier? RefreshNotifier { get; init; }
 
     /// <summary>
-    /// Builds an <see cref="S3Backend"/> bound to these options. The backend
-    /// owns the bandwidth limiters created here and disposes them with itself.
+    /// Builds an <see cref="S3Backend"/> bound to these options.
     /// </summary>
     public S3Backend CreateBackend() => new(
         Bucket,
@@ -152,20 +111,6 @@ internal sealed record ProjFsProviderOptions
         KeyPrefix,
         Region,
         Credentials,
-        CreateLimiter(BandwidthLimits.UpBytesPerSecond),
-        CreateLimiter(BandwidthLimits.DownBytesPerSecond),
-        MultipartThresholdBytes,
-        MultipartPartSizeBytes,
         RetryMaxAttempts,
-        MaxConcurrentUploads,
-        MaxConcurrentDownloads,
-        MaxMultipartParts,
         RefreshNotifier);
-
-    /// <summary>
-    /// Builds a token-bucket limiter when <paramref name="bytesPerSecond"/> is
-    /// positive; null otherwise.
-    /// </summary>
-    private static TokenBucketRateLimiter? CreateLimiter(long? bytesPerSecond) =>
-        bytesPerSecond is > 0 ? new TokenBucketRateLimiter(bytesPerSecond.Value) : null;
 }

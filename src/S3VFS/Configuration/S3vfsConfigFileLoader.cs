@@ -258,14 +258,7 @@ internal static class S3vfsConfigFileLoader
             SyncMode = ReadSyncMode(table, sourcePath),
             EventQueue = ReadString(table, "event-queue", "event_queue", sourcePath),
             AwsProfile = ReadString(table, "aws-profile", "aws_profile", sourcePath),
-            BandwidthUp = ReadString(table, "bandwidth-up", "bandwidth_up", sourcePath),
-            BandwidthDown = ReadString(table, "bandwidth-down", "bandwidth_down", sourcePath),
-            MultipartThreshold = ReadString(table, "multipart-threshold", "multipart_threshold", sourcePath),
-            MultipartPartSize = ReadString(table, "multipart-part-size", "multipart_part_size", sourcePath),
             RetryMaxAttempts = ReadInt(table, "retry-max-attempts", "retry_max_attempts", sourcePath),
-            MaxConcurrentUploads = ReadInt(table, "max-concurrent-uploads", "max_concurrent_uploads", sourcePath),
-            MaxConcurrentDownloads = ReadInt(table, "max-concurrent-downloads", "max_concurrent_downloads", sourcePath),
-            MaxMultipartParts = ReadInt(table, "max-multipart-parts", "max_multipart_parts", sourcePath),
             AllowUnversioned = ReadBool(table, "allow-unversioned", "allow_unversioned", sourcePath),
         };
     }
@@ -287,14 +280,7 @@ internal static class S3vfsConfigFileLoader
         || mount.SyncMode is not null
         || mount.EventQueue is not null
         || mount.AwsProfile is not null
-        || mount.BandwidthUp is not null
-        || mount.BandwidthDown is not null
-        || mount.MultipartThreshold is not null
-        || mount.MultipartPartSize is not null
         || mount.RetryMaxAttempts is not null
-        || mount.MaxConcurrentUploads is not null
-        || mount.MaxConcurrentDownloads is not null
-        || mount.MaxMultipartParts is not null
         || mount.AllowUnversioned is not null;
 
     /// <summary>
@@ -322,14 +308,7 @@ internal static class S3vfsConfigFileLoader
             "sync-mode", "sync_mode",
             "event-queue", "event_queue",
             "aws-profile", "aws_profile",
-            "bandwidth-up", "bandwidth_up",
-            "bandwidth-down", "bandwidth_down",
-            "multipart-threshold", "multipart_threshold",
-            "multipart-part-size", "multipart_part_size",
             "retry-max-attempts", "retry_max_attempts",
-            "max-concurrent-uploads", "max_concurrent_uploads",
-            "max-concurrent-downloads", "max_concurrent_downloads",
-            "max-multipart-parts", "max_multipart_parts",
             "allow-unversioned", "allow_unversioned",
         ];
 
