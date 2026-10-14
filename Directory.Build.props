@@ -13,10 +13,10 @@
         <TreatWarningsAsErrors Condition="'$(Configuration)' == 'Release'">true</TreatWarningsAsErrors>
 
         <!-- Assembly metadata -->
-        <Version>$(OsvfsVersion)</Version>
+        <Version>$(S3vfsVersion)</Version>
         <Authors>sartan123</Authors>
         <Company>sartan123</Company>
-        <Product>OSVFS for Windows</Product>
+        <Product>S3VFS for Windows</Product>
         <Copyright>Copyright (c) sartan123</Copyright>
         <RepositoryUrl>https://github.com/sartan123/S3Files-for-Windows</RepositoryUrl>
         <RepositoryType>git</RepositoryType>
@@ -38,12 +38,9 @@
         <!--
           AOT / Trim warnings come from third-party libs that have not (yet) opted
           into the IsAotCompatible / IsTrimmable contract:
-            * AWSSDK.* (S3, SQS, SSO, Core)
-            * Azure.Storage.Blobs / Azure.Storage.Queues (transitive: System.ClientModel,
-              System.Memory.Data) — IL3058 surfaces because the assemblies don't carry
-              the marker; the AOT publish smoke job (#50) confirms the binary actually
-              links and runs.
-            * Azure.Identity (transitive: System.Diagnostics.DiagnosticSource)
+            * AWSSDK.* (S3, SQS, SSO, Core) — IL3058 surfaces because the assemblies
+              don't carry the marker; the AOT publish smoke job (#50) confirms the
+              binary actually links and runs.
             * System.CommandLine
             * Microsoft.Windows.ProjFS / Tomlyn (IL2104 trim warnings)
           Keep them as warnings even when TreatWarningsAsErrors=true so Release builds

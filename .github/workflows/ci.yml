@@ -52,14 +52,14 @@ jobs:
             nuget-${{ runner.os }}-
 
       - name: Restore (locked)
-        run: dotnet restore OSVFS.slnx --locked-mode
+        run: dotnet restore S3VFS.slnx --locked-mode
 
       - name: Build (Release)
-        run: dotnet build OSVFS.slnx --configuration Release --no-restore
+        run: dotnet build S3VFS.slnx --configuration Release --no-restore
 
       - name: Unit tests
         run: >
-          dotnet test tests/OSVFS.Core.UnitTests/OSVFS.Core.UnitTests.csproj
+          dotnet test tests/S3VFS.Core.UnitTests/S3VFS.Core.UnitTests.csproj
           --configuration Release
           --no-build
           --logger "trx;LogFileName=unit.trx"
@@ -107,17 +107,17 @@ jobs:
       # IntegrationTests). The Windows host project pulls in Microsoft.Windows.ProjFS
       # which is not buildable on Linux, but it is not referenced from these tests.
       - name: Restore (locked)
-        run: dotnet restore tests/OSVFS.Core.IntegrationTests/OSVFS.Core.IntegrationTests.csproj --locked-mode
+        run: dotnet restore tests/S3VFS.Core.IntegrationTests/S3VFS.Core.IntegrationTests.csproj --locked-mode
 
       - name: Build integration tests (Release)
         run: >
-          dotnet build tests/OSVFS.Core.IntegrationTests/OSVFS.Core.IntegrationTests.csproj
+          dotnet build tests/S3VFS.Core.IntegrationTests/S3VFS.Core.IntegrationTests.csproj
           --configuration Release
           --no-restore
 
       - name: Integration tests
         run: >
-          dotnet test tests/OSVFS.Core.IntegrationTests/OSVFS.Core.IntegrationTests.csproj
+          dotnet test tests/S3VFS.Core.IntegrationTests/S3VFS.Core.IntegrationTests.csproj
           --configuration Release
           --no-build
           --logger "trx;LogFileName=integration.trx"
@@ -167,23 +167,23 @@ jobs:
             nuget-${{ runner.os }}-
 
       - name: Restore (locked)
-        run: dotnet restore src/OSVFS/OSVFS.csproj --locked-mode
+        run: dotnet restore src/S3VFS/S3VFS.csproj --locked-mode
 
       - name: Native AOT publish
         run: >
-          dotnet publish src/OSVFS/OSVFS.csproj
+          dotnet publish src/S3VFS/S3VFS.csproj
           --configuration Release
           --runtime win-x64
           --no-restore
           --output publish/win-x64
 
-      - name: Verify osvfs.exe is produced
+      - name: Verify s3vfs.exe is produced
         shell: pwsh
         run: |
-          if (-not (Test-Path 'publish/win-x64/osvfs.exe')) {
-            throw 'AOT publish did not produce osvfs.exe'
+          if (-not (Test-Path 'publish/win-x64/s3vfs.exe')) {
+            throw 'AOT publish did not produce s3vfs.exe'
           }
-          Get-Item 'publish/win-x64/osvfs.exe' | Format-List Name, Length, LastWriteTime
+          Get-Item 'publish/win-x64/s3vfs.exe' | Format-List Name, Length, LastWriteTime
 
   dependency-review:
     name: Dependency Review

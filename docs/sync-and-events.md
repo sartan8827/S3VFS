@@ -2,17 +2,15 @@
 
 [← Back to README](../README.md) · [日本語版](./sync-and-events.ja.md)
 
-How OSVFS picks up remote changes (polling vs. event-driven), how often it
-reconciles, and how to flip a mount into read-only mode. AWS S3 uses
-EventBridge → SQS for push-mode notifications; Azure Blob uses Event Grid
-→ Storage Queue (see [Authentication and credentials](./credentials.md)
-for queue auth).
+How S3VFS picks up remote changes (polling vs. event-driven), how often it
+reconciles, and how to flip a mount into read-only mode. Push-mode
+notifications use S3 → EventBridge → SQS.
 
 ---
 
 ## Change detection modes
 
-OSVFS supports two strategies for detecting changes that other clients (the
+S3VFS supports two strategies for detecting changes that other clients (the
 AWS console, another `aws s3 cp`, a teammate's machine) make to the bucket.
 Pick the one that matches your bucket size, latency budget, and how much
 server-side configuration you can do.
@@ -36,7 +34,7 @@ the same actions are available in the console under SQS / EventBridge / S3.
 1. **Create the SQS queue.**
 
    ```bash
-   aws sqs create-queue --queue-name osvfs-changes \
+   aws sqs create-queue --queue-name s3vfs-changes \
      --attributes ReceiveMessageWaitTimeSeconds=20
    ```
 
@@ -52,7 +50,7 @@ the same actions are available in the console under SQS / EventBridge / S3.
        "Effect": "Allow",
        "Principal": { "Service": "events.amazonaws.com" },
        "Action": "sqs:SendMessage",
-       "Resource": "arn:aws:sqs:REGION:ACCOUNT_ID:osvfs-changes"
+       "Resource": "arn:aws:sqs:REGION:ACCOUNT_ID:s3vfs-changes"
      }]
    }
    ```
@@ -89,15 +87,15 @@ the same actions are available in the console under SQS / EventBridge / S3.
 
    ```bash
    aws events put-rule \
-     --name osvfs-bucket-changes \
+     --name s3vfs-bucket-changes \
      --event-pattern file://event-pattern.json
 
    aws events put-targets \
-     --rule osvfs-bucket-changes \
-     --targets 'Id=osvfs-sqs,Arn=arn:aws:sqs:REGION:ACCOUNT_ID:osvfs-changes'
+     --rule s3vfs-bucket-changes \
+     --targets 'Id=s3vfs-sqs,Arn=arn:aws:sqs:REGION:ACCOUNT_ID:s3vfs-changes'
    ```
 
-The IAM identity that OSVFS runs as needs `sqs:ReceiveMessage`,
+The IAM identity that S3VFS runs as needs `sqs:ReceiveMessage`,
 `sqs:DeleteMessage`, and (when `event-queue` is a bare name)
 `sqs:GetQueueUrl` on the queue.
 
@@ -105,12 +103,12 @@ Then point the mount at the queue in your config:
 
 ```toml
 bucket        = "my-bucket"
-root-folder   = "C:/Users/you/OSVFS"
+root-folder   = "C:/Users/you/S3VFS"
 change-source = "events"
-event-queue   = "https://sqs.ap-northeast-1.amazonaws.com/123456789012/osvfs-changes"
+event-queue   = "https://sqs.ap-northeast-1.amazonaws.com/123456789012/s3vfs-changes"
 ```
 
-> One queue per virtualization root. Two `osvfs` instances sharing a queue
+> One queue per virtualization root. Two `s3vfs` instances sharing a queue
 > would each see only half of the messages.
 
 ## On-demand sync
@@ -124,7 +122,7 @@ event-queue   = "https://sqs.ap-northeast-1.amazonaws.com/123456789012/osvfs-cha
 
 ## Sync interval for large buckets
 
-`osvfs` detects external object-store changes by re-listing the bucket every
+`s3vfs` detects external object-store changes by re-listing the bucket every
 `sync-interval-seconds` (default `30`). Under `sync-mode = "full"` each poll
 walks every page of `ListObjectsV2` for the configured prefix; under
 `sync-mode = "on-demand"` each poll re-lists every visited directory once with
@@ -148,11 +146,11 @@ not one per 1000 keys in the bucket.
 
 A virtualization root can be flipped into a one-way "read from the bucket,
 never write back" mode by setting `read-only = true` in
-[`osvfs.toml`](#configuration-file):
+[`s3vfs.toml`](#configuration-file):
 
 ```toml
 bucket      = "my-bucket"
-root-folder = "C:/Users/you/OSVFS"
+root-folder = "C:/Users/you/S3VFS"
 read-only   = true
 ```
 
@@ -164,7 +162,7 @@ When `read-only` is on:
   any S3 call would happen. New-file create / overwrite / modified-handle
   notifications are still received but the upload path is short-circuited.
 - The object-store change watcher is disabled. No `ListObjectsV2` polling
-  and no SQS receive runs, and the `.osvfs-lost+found` quarantine
+  and no SQS receive runs, and the `.s3vfs-lost+found` quarantine
   directory is never created. A read-only mount is therefore a **frozen
   snapshot** as of the moment each directory was first enumerated —
   remote edits made by other clients are not picked up while the mount is
