@@ -1,7 +1,6 @@
 using Amazon.Runtime;
 using Microsoft.Extensions.Logging.Abstractions;
 using S3VFS.Configuration;
-using S3VFS.ObjectStore;
 using Xunit;
 
 namespace S3VFS.UnitTests.Configuration;
@@ -124,10 +123,8 @@ public class MountOptionsBuilderTests
         var options = MountOptionsBuilder.Build(
             mount, sharedResolver, NullLogger.Instance);
 
-        Assert.NotNull(options.Credentials);
-        var aws = Assert.IsType<AwsCredentialSource>(options.Credentials);
-        Assert.Same(sdkCredentials, aws.Sdk);
-        Assert.Contains("credential_process", options.Credentials.Description);
+        Assert.Same(sdkCredentials, options.Credentials);
+        Assert.Contains("credential_process", options.CredentialDescription);
         Assert.Equal(1, sharedResolver.Calls);
         Assert.Equal("s3vfs-login", sharedResolver.LastProfileName);
     }

@@ -83,7 +83,8 @@ internal static class MountOptionsBuilder
             ChangeSource = changeSource,
             SyncMode = mount.SyncMode ?? SyncMode.OnDemand,
             EventQueue = mount.EventQueue,
-            Credentials = credentials,
+            Credentials = credentials?.Credentials,
+            CredentialDescription = credentials?.Description,
             RetryMaxAttempts = mount.RetryMaxAttempts,
             AllowUnversioned = mount.AllowUnversioned ?? false,
             RefreshNotifier = refreshNotifier,
@@ -100,7 +101,7 @@ internal static class MountOptionsBuilder
     /// <see cref="S3vfsConfigException"/> naming the mount so multi-mount runs
     /// surface which entry blew up.
     /// </summary>
-    private static AwsCredentialSource? ResolveCredential(
+    private static SharedProfileResolution? ResolveCredential(
         ISharedProfileResolver sharedProfileResolver,
         string? profileName,
         string mountName,
@@ -113,7 +114,7 @@ internal static class MountOptionsBuilder
         {
             logger.LogInformation(
                 "Mount '{Mount}': using AWS credentials from {Source}.", mountName, shared.Description);
-            return AwsCredentialSource.FromSdk(shared.Credentials, shared.Description);
+            return shared;
         }
 
         throw new S3vfsConfigException(

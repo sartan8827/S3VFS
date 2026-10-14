@@ -66,7 +66,8 @@ internal sealed class S3Backend : IObjectStoreBackend, IDisposable
     /// <summary>
     /// Creates a backend bound to <paramref name="bucketName"/>. <paramref name="endpointUrl"/>
     /// switches the client into path-style addressing (LocalStack/MinIO); <paramref name="region"/>
-    /// drives request signing; <paramref name="credentials"/> short-circuits the SDK chain.
+    /// drives request signing; <paramref name="credentials"/> short-circuits the SDK chain and
+    /// <paramref name="credentialDescription"/> names their source in refresh notifications.
     /// <paramref name="retryMaxAttempts"/> sets the total attempt count the SDK
     /// will make for transient failures (initial + retries). Null falls back to
     /// <see cref="DefaultRetryMaxAttempts"/>; <c>1</c> disables retries.
@@ -79,23 +80,23 @@ internal sealed class S3Backend : IObjectStoreBackend, IDisposable
         string? endpointUrl = null,
         string? keyPrefix = null,
         string? region = null,
-        AwsCredentialSource? credentials = null,
+        AWSCredentials? credentials = null,
+        string? credentialDescription = null,
         int? retryMaxAttempts = null,
         ICredentialRefreshNotifier? refreshNotifier = null)
     {
         this.bucketName = bucketName;
         this.keyPrefix = KeyPath.NormalizeKeyPrefix(keyPrefix);
         this.refreshNotifier = refreshNotifier;
-        credentialDescription = credentials?.Description;
+        this.credentialDescription = credentialDescription;
         var attempts = retryMaxAttempts ?? DefaultRetryMaxAttempts;
-        // Materialize once so the same AWSCredentials instance feeds both the
-        // SDK client AND the ExpiredToken retry helper. SDK-issued refreshing
+        // The same AWSCredentials instance feeds both the SDK client AND the
+        // ExpiredToken retry helper. SDK-issued refreshing
         // credentials (SSO, credential_process, AssumeRole, …) all derive
         // from RefreshingAWSCredentials and therefore expose ClearCredentials()
         // so we can force a re-fetch from outside the SDK pipeline.
-        var awsCredentials = credentials?.Materialize();
-        refreshableCredentials = awsCredentials as RefreshingAWSCredentials;
-        client = CreateClient(endpointUrl, region, awsCredentials, attempts);
+        refreshableCredentials = credentials as RefreshingAWSCredentials;
+        client = CreateClient(endpointUrl, region, credentials, attempts);
         // Share a single TransferUtility per backend: it's documented thread-safe, holds no
         // upload-specific state, and disposes only its internally-created client (not ours).
         // Multipart threshold, part size, and part parallelism use the SDK defaults.

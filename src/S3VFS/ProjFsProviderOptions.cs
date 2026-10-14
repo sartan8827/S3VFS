@@ -1,3 +1,4 @@
+using Amazon.Runtime;
 using S3VFS.Configuration;
 using S3VFS.ObjectStore;
 using S3VFS.ObjectStore.S3;
@@ -74,10 +75,17 @@ internal sealed record ProjFsProviderOptions
     public string? EventQueue { get; init; }
 
     /// <summary>
-    /// Optional AWS credential source resolved from the mount config. Null
-    /// falls back to the AWS SDK's default credential chain.
+    /// Optional AWS credentials resolved from the mount's <c>aws-profile</c>.
+    /// Null falls back to the AWS SDK's default credential chain.
     /// </summary>
-    public AwsCredentialSource? Credentials { get; init; }
+    public AWSCredentials? Credentials { get; init; }
+
+    /// <summary>
+    /// Human-readable description of where <see cref="Credentials"/> came from
+    /// (e.g. <c>"shared profile 'prod' (sso)"</c>), shown in credential refresh
+    /// notifications. Null when the SDK default chain is used.
+    /// </summary>
+    public string? CredentialDescription { get; init; }
 
     /// <summary>
     /// Total attempts (initial + retries) the AWS SDK makes on transient
@@ -111,6 +119,7 @@ internal sealed record ProjFsProviderOptions
         KeyPrefix,
         Region,
         Credentials,
+        CredentialDescription,
         RetryMaxAttempts,
         RefreshNotifier);
 }
