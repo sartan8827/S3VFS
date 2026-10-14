@@ -73,8 +73,8 @@ The detailed reference is split into focused pages under
   mounts, and SQS setup.
 - **[Observability](docs/observability.md)** — structured logging and
   user-metadata round-trip.
-- **[Authentication and credentials](docs/credentials.md)** — the S3VFS
-  credential store and AWS shared profile / SSO / `aws login`.
+- **[Authentication and credentials](docs/credentials.md)** — AWS
+  shared profile / SSO / `aws login`.
 - **[Troubleshooting](docs/troubleshooting.md)** — reading start-up
   errors and the `s3vfs lost-and-found` recovery CLI.
 

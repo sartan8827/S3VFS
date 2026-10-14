@@ -2,7 +2,6 @@ using Amazon.Runtime;
 using Microsoft.Extensions.Logging.Abstractions;
 using S3VFS.Configuration;
 using S3VFS.ObjectStore;
-using S3VFS.UnitTests.Credentials;
 using Xunit;
 
 namespace S3VFS.UnitTests.Configuration;
@@ -36,7 +35,7 @@ public class MountOptionsBuilderTests
             RetryMaxAttempts = 5,
         };
 
-        var options = MountOptionsBuilder.Build(mount, new FakeCredentialStore(), NullLogger.Instance);
+        var options = MountOptionsBuilder.Build(mount, NullLogger.Instance);
 
         Assert.Equal("alpha-bucket", options.Bucket);
         Assert.Equal(@"C:\mounts\alpha", options.VirtRoot);
@@ -62,7 +61,7 @@ public class MountOptionsBuilderTests
         };
 
         var ex = Assert.Throws<S3vfsConfigException>(() =>
-            MountOptionsBuilder.Build(mount, new FakeCredentialStore(), NullLogger.Instance));
+            MountOptionsBuilder.Build(mount, NullLogger.Instance));
         Assert.Contains("alpha", ex.Message, StringComparison.Ordinal);
         Assert.Contains("bucket", ex.Message, StringComparison.Ordinal);
     }
@@ -77,7 +76,7 @@ public class MountOptionsBuilderTests
         };
 
         var ex = Assert.Throws<S3vfsConfigException>(() =>
-            MountOptionsBuilder.Build(mount, new FakeCredentialStore(), NullLogger.Instance));
+            MountOptionsBuilder.Build(mount, NullLogger.Instance));
         Assert.Contains("root-folder", ex.Message, StringComparison.Ordinal);
     }
 
@@ -93,7 +92,7 @@ public class MountOptionsBuilderTests
         };
 
         var ex = Assert.Throws<S3vfsConfigException>(() =>
-            MountOptionsBuilder.Build(mount, new FakeCredentialStore(), NullLogger.Instance));
+            MountOptionsBuilder.Build(mount, NullLogger.Instance));
         Assert.Contains("event-queue", ex.Message, StringComparison.Ordinal);
     }
 
@@ -109,7 +108,7 @@ public class MountOptionsBuilderTests
         };
 
         var ex = Assert.Throws<S3vfsConfigException>(() =>
-            MountOptionsBuilder.Build(mount, new FakeCredentialStore(), NullLogger.Instance));
+            MountOptionsBuilder.Build(mount, NullLogger.Instance));
         Assert.Contains("retry-max-attempts", ex.Message, StringComparison.Ordinal);
     }
 
@@ -127,7 +126,7 @@ public class MountOptionsBuilderTests
         };
 
         var ex = Assert.Throws<S3vfsConfigException>(() =>
-            MountOptionsBuilder.Build(mount, new FakeCredentialStore(), NullLogger.Instance));
+            MountOptionsBuilder.Build(mount, NullLogger.Instance));
         Assert.Contains("max-concurrent-uploads", ex.Message, StringComparison.Ordinal);
     }
 
@@ -143,7 +142,7 @@ public class MountOptionsBuilderTests
         };
 
         var ex = Assert.Throws<S3vfsConfigException>(() =>
-            MountOptionsBuilder.Build(mount, new FakeCredentialStore(), NullLogger.Instance));
+            MountOptionsBuilder.Build(mount, NullLogger.Instance));
         Assert.Contains("max-concurrent-downloads", ex.Message, StringComparison.Ordinal);
     }
 
@@ -159,7 +158,7 @@ public class MountOptionsBuilderTests
         };
 
         var ex = Assert.Throws<S3vfsConfigException>(() =>
-            MountOptionsBuilder.Build(mount, new FakeCredentialStore(), NullLogger.Instance));
+            MountOptionsBuilder.Build(mount, NullLogger.Instance));
         Assert.Contains("max-multipart-parts", ex.Message, StringComparison.Ordinal);
     }
 
@@ -176,7 +175,7 @@ public class MountOptionsBuilderTests
             MaxMultipartParts = 20,
         };
 
-        var options = MountOptionsBuilder.Build(mount, new FakeCredentialStore(), NullLogger.Instance);
+        var options = MountOptionsBuilder.Build(mount, NullLogger.Instance);
 
         Assert.Equal(6, options.MaxConcurrentUploads);
         Assert.Equal(12, options.MaxConcurrentDownloads);
@@ -184,31 +183,7 @@ public class MountOptionsBuilderTests
     }
 
     [Fact]
-    public void Build_resolves_aws_profile_through_credential_store()
-    {
-        var mount = new S3vfsMountConfig
-        {
-            Name = "alpha",
-            Bucket = "alpha-bucket",
-            RootFolder = @"C:\mounts\alpha",
-            AwsProfile = "prod",
-        };
-        var store = new FakeCredentialStore();
-        store.Save("prod", new AwsCredential { AccessKeyId = "AKIA", SecretAccessKey = "secret" });
-        var sharedResolver = new FakeSharedProfileResolver();
-
-        var options = MountOptionsBuilder.Build(mount, store, sharedResolver, NullLogger.Instance);
-
-        Assert.NotNull(options.Credentials);
-        var aws = Assert.IsType<AwsCredentialSource>(options.Credentials);
-        Assert.NotNull(aws.Static);
-        Assert.Equal("AKIA", aws.Static.AccessKeyId);
-        Assert.Contains("S3VFS profile 'prod'", options.Credentials.Description);
-        Assert.Equal(0, sharedResolver.Calls);
-    }
-
-    [Fact]
-    public void Build_falls_back_to_shared_profile_when_dpapi_store_misses()
+    public void Build_resolves_aws_profile_through_shared_profile_store()
     {
         var mount = new S3vfsMountConfig
         {
@@ -225,7 +200,7 @@ public class MountOptionsBuilderTests
         };
 
         var options = MountOptionsBuilder.Build(
-            mount, new FakeCredentialStore(), sharedResolver, NullLogger.Instance);
+            mount, sharedResolver, NullLogger.Instance);
 
         Assert.NotNull(options.Credentials);
         var aws = Assert.IsType<AwsCredentialSource>(options.Credentials);
@@ -236,7 +211,7 @@ public class MountOptionsBuilderTests
     }
 
     [Fact]
-    public void Build_throws_when_aws_profile_missing_in_both_stores()
+    public void Build_throws_when_aws_profile_is_not_found()
     {
         var mount = new S3vfsMountConfig
         {
@@ -248,7 +223,7 @@ public class MountOptionsBuilderTests
 
         var ex = Assert.Throws<S3vfsConfigException>(() =>
             MountOptionsBuilder.Build(
-                mount, new FakeCredentialStore(), new FakeSharedProfileResolver(), NullLogger.Instance));
+                mount, new FakeSharedProfileResolver(), NullLogger.Instance));
         Assert.Contains("absent", ex.Message, StringComparison.Ordinal);
         Assert.Contains("aws login", ex.Message, StringComparison.Ordinal);
     }
@@ -263,7 +238,7 @@ public class MountOptionsBuilderTests
             RootFolder = @"C:\b",
         };
 
-        var options = MountOptionsBuilder.Build(mount, new FakeCredentialStore(), NullLogger.Instance);
+        var options = MountOptionsBuilder.Build(mount, NullLogger.Instance);
 
         Assert.False(options.ReadOnly);
         Assert.Equal(30, options.SyncIntervalSeconds);

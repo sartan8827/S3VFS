@@ -75,8 +75,8 @@ S3 互換サービスはサポート対象外です。
   SQS の構成。
 - **[可観測性](docs/observability.ja.md)** — 構造化ログとユーザー定義
   メタデータの往復保持。
-- **[認証とクレデンシャル](docs/credentials.ja.md)** — S3VFS の
-  クレデンシャルストアと AWS shared profile / SSO / `aws login`。
+- **[認証とクレデンシャル](docs/credentials.ja.md)** — AWS
+  shared profile / SSO / `aws login`。
 - **[トラブルシューティング](docs/troubleshooting.ja.md)** —
   起動時エラーの読み方と `s3vfs lost-and-found` 復元 CLI。
 

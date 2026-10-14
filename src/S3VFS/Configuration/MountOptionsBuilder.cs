@@ -1,5 +1,4 @@
 using Microsoft.Extensions.Logging;
-using S3VFS.Credentials;
 using S3VFS.Net;
 using S3VFS.ObjectStore;
 
@@ -20,15 +19,13 @@ internal static class MountOptionsBuilder
     /// (<c>bucket</c> / <c>root-folder</c>) is missing, when a referenced AWS
     /// profile cannot be resolved, or when bandwidth / multipart / retry
     /// values fail their bounds checks. The supplied <paramref name="logger"/>
-    /// is used only for the credential-store "Using AWS credentials from
-    /// profile X" notice.
+    /// is used only for the "using AWS credentials from profile X" notice.
     /// </summary>
     public static ProjFsProviderOptions Build(
         S3vfsMountConfig mount,
-        IAwsCredentialStore credentialStore,
         ILogger logger,
         ICredentialRefreshNotifier? refreshNotifier = null) =>
-        Build(mount, credentialStore, DefaultSharedProfileResolver.Instance, logger, refreshNotifier);
+        Build(mount, DefaultSharedProfileResolver.Instance, logger, refreshNotifier);
 
     /// <summary>
     /// Test-friendly overload that lets callers swap out the SDK shared-profile
@@ -36,7 +33,6 @@ internal static class MountOptionsBuilder
     /// </summary>
     internal static ProjFsProviderOptions Build(
         S3vfsMountConfig mount,
-        IAwsCredentialStore credentialStore,
         ISharedProfileResolver sharedProfileResolver,
         ILogger logger,
         ICredentialRefreshNotifier? refreshNotifier = null)
@@ -56,7 +52,7 @@ internal static class MountOptionsBuilder
         }
 
         var credentials = ResolveCredential(
-            credentialStore, sharedProfileResolver, mount.AwsProfile, mount.Name, logger);
+            sharedProfileResolver, mount.AwsProfile, mount.Name, logger);
 
         BandwidthLimits bandwidthLimits;
         long? multipartThresholdBytes;
@@ -145,34 +141,22 @@ internal static class MountOptionsBuilder
     }
 
     /// <summary>
-    /// Resolves an <c>aws-profile</c> name in two steps:
-    /// 1. The S3VFS DPAPI store (encrypted static credentials managed by
-    ///    <c>s3vfs credentials set</c>).
-    /// 2. The shared AWS profile store via <paramref name="sharedProfileResolver"/>
-    ///    (covers static keys in <c>~/.aws/credentials</c>, <c>credential_process</c>
-    ///    profiles produced by <c>aws login</c>, <c>sso_session</c> profiles
-    ///    written by <c>aws configure sso</c>, and assume-role chains). The SDK
-    ///    handles refresh for these natively.
-    /// Both misses are reported as a single <see cref="S3vfsConfigException"/> so
-    /// multi-mount runs surface which entry blew up.
+    /// Resolves an <c>aws-profile</c> name through the shared AWS profile store
+    /// via <paramref name="sharedProfileResolver"/> (covers static keys in
+    /// <c>~/.aws/credentials</c>, <c>credential_process</c> profiles produced by
+    /// <c>aws login</c>, <c>sso_session</c> profiles written by
+    /// <c>aws configure sso</c>, and assume-role chains). The SDK handles refresh
+    /// for these natively. A miss is reported as an
+    /// <see cref="S3vfsConfigException"/> naming the mount so multi-mount runs
+    /// surface which entry blew up.
     /// </summary>
     private static AwsCredentialSource? ResolveCredential(
-        IAwsCredentialStore store,
         ISharedProfileResolver sharedProfileResolver,
         string? profileName,
         string mountName,
         ILogger logger)
     {
         if (string.IsNullOrEmpty(profileName)) return null;
-
-        var stored = store.Load(profileName);
-        if (stored is not null)
-        {
-            var description = $"S3VFS profile '{profileName}'";
-            logger.LogInformation(
-                "Mount '{Mount}': using AWS credentials from {Source}.", mountName, description);
-            return AwsCredentialSource.FromStatic(stored, description);
-        }
 
         var shared = sharedProfileResolver.Resolve(profileName);
         if (shared is not null)
@@ -183,11 +167,10 @@ internal static class MountOptionsBuilder
         }
 
         throw new S3vfsConfigException(
-            $"Mount '{mountName}': AWS profile '{profileName}' was not found in the S3VFS " +
-            "credential store or in the shared AWS profile store (~/.aws/config, " +
-            "~/.aws/credentials). Run 's3vfs credentials set --profile <name>' to create an " +
-            "S3VFS-managed entry, or configure the profile in the shared AWS files (e.g. via " +
+            $"Mount '{mountName}': AWS profile '{profileName}' was not found in the shared AWS " +
+            "profile store (~/.aws/config, ~/.aws/credentials). Configure the profile with the " +
+            "AWS CLI, e.g. 'aws configure --profile <name>' for access keys, " +
             "'aws configure sso --profile <name>' for IAM Identity Center, or " +
-            "'aws login --profile <name>' for AWS CLI 2.32+).");
+            "'aws login --profile <name>' for AWS CLI 2.32+.");
     }
 }

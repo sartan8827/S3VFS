@@ -14,9 +14,8 @@ multi-mount layout). For AWS credential resolution see
 - Windows 10 1809 (build 17763) or later, or Windows 11
 - The Windows optional feature **`Client-ProjFS`** must be enabled
 - AWS credentials reachable via the standard AWS SDK chain (environment
-  variables, shared profile, IAM role, etc.) — or saved into the S3VFS
-  built-in encrypted store described in
-  [Managing AWS credentials](#managing-aws-credentials)
+  variables, shared profile, IAM role, etc.) — see
+  [Authentication and credentials](./credentials.md)
 - An S3 bucket you have read/write access to
 - **Bucket versioning must be Enabled** on the target bucket. `s3vfs`
   refuses to start otherwise — see [Why versioning matters](#why-versioning-matters)
@@ -87,7 +86,7 @@ exposes just three things:
 
 | Surface | Purpose |
 | --- | --- |
-| Sub-commands (`help`, `mount`, `credentials`, `lost-and-found`) | Show the supported commands and options (also printed by a bare `s3vfs`), pick which mount(s) to start, manage the encrypted credential store, or recover quarantined files. |
+| Sub-commands (`help`, `mount`, `lost-and-found`) | Show the supported commands and options (also printed by a bare `s3vfs`), pick which mount(s) to start, or recover quarantined files. |
 | `--name <mount>` | Selects a single entry from the `[[mount]]` array on `s3vfs mount`; when omitted, every entry is started. |
 | `--verbose`, `--log-format` | Process-level overrides for one-off debugging. The TOML keys (`verbose`, `log-format`) are still honoured; the CLI flags simply win when both are present. |
 
@@ -108,7 +107,7 @@ earlier ones on a per-key basis:
    packaged baseline). Resolved via `AppContext.BaseDirectory`, so the lookup
    is independent of the current working directory.
 2. **`%APPDATA%\S3VFS\config.toml`** (per-user, machine-global). Operators
-   typically keep credentials / log preferences here.
+   typically keep per-user settings (`aws-profile`, log preferences) here.
 3. **`--config <path>`** (highest priority). Useful when an operator wants to
    pick between several profile files without editing the standard locations.
    Unlike sources #1 and #2, a missing path here is a hard error rather than
@@ -116,9 +115,6 @@ earlier ones on a per-key basis:
 
 Process-level CLI flags (`--verbose`, `--log-format`) override the merged
 config file values when supplied.
-
-`credentials` sub-commands are not affected by the config file; they always
-take their inputs from CLI arguments and interactive prompts.
 
 ```toml
 # ./s3vfs.toml or %APPDATA%\S3VFS\config.toml

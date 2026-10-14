@@ -31,7 +31,6 @@
     <PackageReference Include="System.CommandLine" />
     <PackageReference Include="Microsoft.Windows.ProjFS" />
     <PackageReference Include="Microsoft.Extensions.Logging.Console" />
-    <PackageReference Include="System.Security.Cryptography.ProtectedData" />
     <PackageReference Include="Tomlyn" />
   </ItemGroup>
 

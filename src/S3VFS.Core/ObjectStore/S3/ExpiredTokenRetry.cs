@@ -10,7 +10,7 @@ namespace S3VFS.ObjectStore.S3;
 /// <see cref="RefreshingAWSCredentials"/> the SDK ships
 /// (<see cref="Amazon.Runtime.AssumeRoleAWSCredentials"/>,
 /// SSO, <see cref="ProcessAWSCredentials"/>, …) normally rolls the
-/// credential over before its <see cref="AwsCredential.ExpiresAt"/>, but
+/// credential over before it expires, but
 /// wall-clock skew, machine sleep / resume, or a locally-cached credential
 /// that turned out to be already-expired can still produce an
 /// <c>ExpiredToken</c> response on the wire. The retry hides that race
@@ -21,7 +21,7 @@ namespace S3VFS.ObjectStore.S3;
 /// <see cref="ICredentialRefreshNotifier.NotifyRefreshed"/>; on retry
 /// failure <see cref="ICredentialRefreshNotifier.NotifyRefreshFailure"/>
 /// raises the operator-facing toast so they know to re-run
-/// <c>aws configure sso</c> / <c>aws login</c> / <c>credentials set</c>.
+/// <c>aws configure sso</c> / <c>aws login</c>.
 /// </para>
 /// </summary>
 internal static class ExpiredTokenRetry

@@ -3,49 +3,30 @@ using Amazon.Runtime;
 namespace S3VFS.ObjectStore;
 
 /// <summary>
-/// Discriminated wrapper that carries either S3VFS-managed static credentials or a
-/// refreshing <see cref="AWSCredentials"/> instance handed back by the AWS SDK
-/// (for shared <c>~/.aws/config</c> profiles, <c>credential_process</c>, SSO,
-/// assume-role chains, etc.). Backends call <see cref="Materialize"/> to obtain
-/// the SDK credential object to feed into <see cref="AmazonServiceClient"/>s,
-/// regardless of which side of the union supplied it.
+/// Pairs a refreshing <see cref="AWSCredentials"/> instance handed back by the AWS
+/// SDK (for shared <c>~/.aws/config</c> profiles, <c>credential_process</c>, SSO,
+/// assume-role chains, etc.) with a description of where it came from. Backends
+/// call <see cref="Materialize"/> to obtain the SDK credential object to feed into
+/// <see cref="AmazonServiceClient"/>s.
 /// </summary>
 internal sealed class AwsCredentialSource
 {
     /// <summary>
-    /// Static AWS credentials originating from the S3VFS DPAPI store, when this
-    /// source represents the static branch; null on the SDK-wrapped branch.
+    /// SDK-resolved credentials (e.g. <see cref="ProcessAWSCredentials"/>).
     /// </summary>
-    public AwsCredential? Static { get; }
-
-    /// <summary>
-    /// SDK-resolved credentials (e.g. <see cref="ProcessAWSCredentials"/>), when
-    /// this source wraps a refreshing AWSCredentials; null on the static branch.
-    /// </summary>
-    public AWSCredentials? Sdk { get; }
+    public AWSCredentials Sdk { get; }
 
     /// <summary>
     /// Human-readable description of the resolution path (e.g.
-    /// <c>"S3VFS profile 'prod'"</c> or <c>"shared profile 's3vfs-login' (sso)"</c>).
+    /// <c>"shared profile 's3vfs-login' (sso)"</c>).
     /// Surfaced in the mount-startup log message.
     /// </summary>
     public string Description { get; }
 
-    private AwsCredentialSource(AwsCredential? @static, AWSCredentials? sdk, string description)
+    private AwsCredentialSource(AWSCredentials sdk, string description)
     {
-        Static = @static;
         Sdk = sdk;
         Description = description;
-    }
-
-    /// <summary>
-    /// Wraps S3VFS-managed static credentials.
-    /// </summary>
-    public static AwsCredentialSource FromStatic(AwsCredential credential, string description)
-    {
-        ArgumentNullException.ThrowIfNull(credential);
-        ArgumentException.ThrowIfNullOrWhiteSpace(description);
-        return new AwsCredentialSource(credential, sdk: null, description);
     }
 
     /// <summary>
@@ -56,21 +37,11 @@ internal sealed class AwsCredentialSource
     {
         ArgumentNullException.ThrowIfNull(credentials);
         ArgumentException.ThrowIfNullOrWhiteSpace(description);
-        return new AwsCredentialSource(@static: null, credentials, description);
+        return new AwsCredentialSource(credentials, description);
     }
 
     /// <summary>
-    /// Materializes the source into the <see cref="AWSCredentials"/> object the AWS
-    /// SDK clients consume. The static branch builds a fresh <see cref="BasicAWSCredentials"/>
-    /// or <see cref="SessionAWSCredentials"/>; the SDK branch returns the wrapped instance
-    /// so its refresh behavior is preserved.
+    /// Returns the wrapped SDK credentials so their refresh behavior is preserved.
     /// </summary>
-    public AWSCredentials Materialize()
-    {
-        if (Sdk is not null) return Sdk;
-        var c = Static!;
-        return string.IsNullOrEmpty(c.SessionToken)
-            ? new BasicAWSCredentials(c.AccessKeyId, c.SecretAccessKey)
-            : new SessionAWSCredentials(c.AccessKeyId, c.SecretAccessKey, c.SessionToken);
-    }
+    public AWSCredentials Materialize() => Sdk;
 }

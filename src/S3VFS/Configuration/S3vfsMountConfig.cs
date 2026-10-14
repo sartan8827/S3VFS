@@ -70,7 +70,7 @@ internal sealed class S3vfsMountConfig
     public string? EventQueue { get; init; }
 
     /// <summary>
-    /// Profile name in the S3VFS credential store; null means use the SDK's default chain.
+    /// AWS shared profile name (~/.aws/config, ~/.aws/credentials); null means use the SDK's default chain.
     /// </summary>
     public string? AwsProfile { get; init; }
 

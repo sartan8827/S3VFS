@@ -1,6 +1,5 @@
 using Microsoft.Extensions.Logging;
 using S3VFS.Configuration;
-using S3VFS.Credentials;
 using S3VFS.Logging;
 using S3VFS.Notifications;
 using S3VFS.ProjFs;
@@ -22,8 +21,7 @@ internal static class MountCommandFactory
     /// matching mount is started; without it every configured <c>[[mount]]</c>
     /// is started in declaration order inside the same process.
     /// </summary>
-    public static Command BuildMountCommand(
-        IAwsCredentialStore credentialStore, MountCliOptions cliOptions)
+    public static Command BuildMountCommand(MountCliOptions cliOptions)
     {
         var nameOption = new Option<string?>("--name")
         {
@@ -43,8 +41,7 @@ internal static class MountCommandFactory
         };
         cliOptions.AddTo(command);
 
-        command.SetAction(parseResult => RunMount(
-            parseResult, cliOptions, nameOption, credentialStore));
+        command.SetAction(parseResult => RunMount(parseResult, cliOptions, nameOption));
 
         return command;
     }
@@ -57,8 +54,7 @@ internal static class MountCommandFactory
     private static int RunMount(
         ParseResult parseResult,
         MountCliOptions cliOptions,
-        Option<string?> nameOption,
-        IAwsCredentialStore credentialStore)
+        Option<string?> nameOption)
     {
         var cliConfigPath = parseResult.GetValue(cliOptions.ConfigPath);
         S3vfsConfigFile? fileConfig;
@@ -90,7 +86,7 @@ internal static class MountCommandFactory
             ProjFsProviderOptions options;
             try
             {
-                options = MountOptionsBuilder.Build(mount, credentialStore, logger, refreshNotifier);
+                options = MountOptionsBuilder.Build(mount, logger, refreshNotifier);
             }
             catch (S3vfsConfigException ex)
             {

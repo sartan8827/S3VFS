@@ -13,14 +13,14 @@ internal static class HelpCommandFactory
     /// <summary>
     /// Builds <c>s3vfs help [&lt;command&gt;...]</c>. Without arguments it prints
     /// the top-level help; with a sub-command path (for example
-    /// <c>s3vfs help credentials set</c>) it prints that sub-command's help.
+    /// <c>s3vfs help lost-and-found restore</c>) it prints that sub-command's help.
     /// </summary>
     public static Command Build(RootCommand rootCommand)
     {
         var commandPath = new Argument<string[]>("command")
         {
             Arity = ArgumentArity.ZeroOrMore,
-            Description = "Sub-command to show help for (for example 'mount' or 'credentials set'). Omit to show the top-level help.",
+            Description = "Sub-command to show help for (for example 'mount' or 'lost-and-found restore'). Omit to show the top-level help.",
         };
 
         var command = new Command("help", "Show the commands and options s3vfs supports.")

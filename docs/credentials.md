@@ -2,40 +2,26 @@
 
 [← Back to README](../README.md) · [日本語版](./credentials.ja.md)
 
-How S3VFS resolves AWS credentials. Covers the S3VFS DPAPI-encrypted
-credential store, AWS IAM Identity Center (SSO), and AWS CLI 2.32+
-`aws login`.
+How S3VFS resolves AWS credentials. Covers access-key profiles, AWS IAM
+Identity Center (SSO), and AWS CLI 2.32+ `aws login`.
 
 ---
 
 ## Managing AWS credentials
 
-S3VFS can resolve AWS credentials through the standard AWS SDK chain
-(environment variables, the shared `~/.aws/credentials` profile, IAM role,
-IMDS), **or** through its own per-user encrypted store backed by Windows
-Credential Manager. The secret access key — and any STS session token — is
-encrypted with **DPAPI** at `CurrentUser` scope before it is written into the
-credential blob, so the entry can only be decrypted by the user that saved
-it on the same machine.
+S3VFS relies on the standard AWS SDK credential resolution.
+
+- **`aws-profile` omitted**: the SDK default chain is used (environment
+  variables, the `default` profile in `~/.aws/credentials` /
+  `~/.aws/config`, IAM role, IMDS).
+- **`aws-profile` set**: the named profile is loaded from the shared AWS
+  files (`~/.aws/config`, `~/.aws/credentials`). Start-up fails with an
+  error naming the mount when the profile does not exist.
+
+For plain access keys, create the profile with the AWS CLI:
 
 ```powershell
-# Save a profile (the secret prompt is masked)
-s3vfs credentials set --profile prod
-
-# Or pass everything on the command line (skip the prompts)
-s3vfs credentials set --profile prod `
-  --access-key AKIA... `
-  --secret-key ... `
-  --session-token ...   # optional, for temporary credentials
-
-# Inspect a profile (the secret is never echoed)
-s3vfs credentials get --profile prod
-
-# List every profile owned by S3VFS
-s3vfs credentials list
-
-# Delete a profile
-s3vfs credentials remove --profile prod
+aws configure --profile prod
 ```
 
 Then reference the profile in your mount config:
@@ -45,13 +31,6 @@ bucket      = "my-bucket"
 root-folder = "C:/Users/you/S3VFS"
 aws-profile = "prod"
 ```
-
-Each entry is stored as a Windows generic credential under the target name
-`S3VFS:AWS:<profile>`. The credential persists at `LocalMachine` scope
-(it survives logout) but the DPAPI envelope is bound to the saving user, so
-copying the entry to another user — or to another machine — will fail to
-decrypt. Treat the S3VFS store as a per-user convenience cache, not as a
-backup of your AWS credentials.
 
 #### Sign in via AWS IAM Identity Center (SSO)
 
@@ -87,8 +66,8 @@ chain, so there is no S3VFS-specific SSO command to learn.
    aws sso login --sso-session my-org
    ```
 3. **Reference the profile from `s3vfs.toml`** exactly like any other
-   profile name. The S3VFS DPAPI store is consulted first; on a miss S3VFS
-   falls back to the shared profile chain and picks up the SSO entry:
+   profile name. S3VFS resolves it through the shared profile chain and
+   picks up the SSO entry:
    ```toml
    bucket      = "my-bucket"
    root-folder = "C:/Users/you/S3VFS"
@@ -115,7 +94,7 @@ the request once.
 - **Retry fails** (the upstream bearer / refresh token has itself
   expired): a Windows balloon-tip notification "S3VFS: AWS credentials
   expired" tells the operator to re-run `aws sso login` (or
-  `aws login` / `s3vfs credentials set`) to re-authenticate, and the
+  `aws login`) to re-authenticate, and the
   failed request's exception propagates back to the caller.
 
 #### Sign in via `aws login` (AWS CLI 2.32+)
@@ -147,9 +126,9 @@ shared-profile chain** (the AWS-recommended `credential_process` pattern).
    credential_process = aws configure export-credentials --profile signin --format process
    region = us-east-1
    ```
-4. **Reference it from `s3vfs.toml`** like any other profile — when the name is
-   absent from the S3VFS DPAPI store, S3VFS falls back to the SDK shared-profile
-   chain and picks up the `credential_process` entry:
+4. **Reference it from `s3vfs.toml`** like any other profile — S3VFS resolves
+   the name through the SDK shared-profile chain and picks up the
+   `credential_process` entry:
    ```toml
    bucket      = "my-bucket"
    root-folder = "C:/Users/you/S3VFS"

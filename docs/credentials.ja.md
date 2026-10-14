@@ -2,56 +2,35 @@
 
 [← README に戻る](../README.ja.md) · [English](./credentials.md)
 
-S3VFS が AWS のクレデンシャルをどう解決するか。S3VFS の DPAPI 暗号化
-クレデンシャルストア、AWS IAM Identity Center (SSO)、AWS CLI 2.32+ の
-`aws login` を扱います。
+S3VFS が AWS のクレデンシャルをどう解決するか。アクセスキーのプロファイル、
+AWS IAM Identity Center (SSO)、AWS CLI 2.32+ の `aws login` を扱います。
 
 ---
 
 ## AWS 認証情報の管理
 
-S3VFS は AWS SDK 標準の認証情報チェーン (環境変数 / 共有プロファイル
-`~/.aws/credentials` / IAM ロール / IMDS) を利用できるほか、**Windows
-Credential Manager 上に独自のユーザー単位の暗号化ストア**を持つことができま
-す。シークレットアクセスキー (および任意の STS セッショントークン) は
-**DPAPI** の `CurrentUser` スコープで暗号化されたうえで credential blob に
-書き込まれるため、**保存したユーザー本人だけが同一マシン上で復号できる**
-設計です。
+S3VFS はAWS SDK 標準のクレデンシャル解決をそのまま使います。
+
+- **`aws-profile` を省略した場合**: SDK のデフォルトチェーン (環境変数、
+  `~/.aws/credentials` / `~/.aws/config` の `default` プロファイル、IAM ロール、
+  IMDS) を使います。
+- **`aws-profile` を指定した場合**: 共有 AWS ファイル (`~/.aws/config`、
+  `~/.aws/credentials`) から指定したプロファイルを読み込みます。プロファイルが
+  存在しない場合は、どのマウントかを示すエラーで起動を中止します。
+
+アクセスキーをそのまま使う場合は AWS CLI でプロファイルを作成します。
 
 ```powershell
-# 対話入力で保存 (シークレット入力はマスク表示)
-s3vfs credentials set --profile prod
-
-# コマンドラインで全部渡す場合 (対話プロンプトなし)
-s3vfs credentials set --profile prod `
-  --access-key AKIA... `
-  --secret-key ... `
-  --session-token ...   # 一時認証情報のときだけ
-
-# 保存済みプロファイルのメタデータ表示 (シークレットは絶対に表示されません)
-s3vfs credentials get --profile prod
-
-# S3VFS 管理下のプロファイル一覧
-s3vfs credentials list
-
-# 削除
-s3vfs credentials remove --profile prod
+aws configure --profile prod
 ```
 
-その上でマウント設定にプロファイル名を記述します:
+作成したプロファイルをマウント設定から参照します。
 
 ```toml
 bucket      = "my-bucket"
 root-folder = "C:/Users/you/S3VFS"
 aws-profile = "prod"
 ```
-
-エントリは generic credential として `S3VFS:AWS:<profile>` という target
-name で保存され、`LocalMachine` スコープで永続化されます (ログアウト後も
-維持)。一方で blob は保存したユーザーの DPAPI 鍵で暗号化されているため、
-**別ユーザーや別マシンにエントリをコピーしても復号できません**。S3VFS の
-このストアはあくまで「ユーザー単位のローカルキャッシュ」として扱い、AWS
-認証情報のバックアップ用途には使わないでください。
 
 #### AWS IAM Identity Center (SSO) でサインイン
 
@@ -87,9 +66,8 @@ AWS IAM Identity Center (旧 AWS SSO) を利用する環境では、AWS CLI 標�
    ```powershell
    aws sso login --sso-session my-org
    ```
-3. **`s3vfs.toml` から参照**。S3VFS DPAPI ストアに無いプロファイル名は
-   SDK 共有プロファイルチェーンへフォールバックして SSO エントリを
-   拾います:
+3. **`s3vfs.toml` から参照**。プロファイル名を指定すると、SDK 共有
+   プロファイルチェーンから SSO エントリを拾います:
    ```toml
    bucket      = "my-bucket"
    root-folder = "C:/Users/you/S3VFS"
@@ -114,8 +92,8 @@ SDK が提供する `SSOAWSCredentials` (および `credential_process` /
   マウントは継続します。
 - **再試行失敗** (上流のベアラトークン / リフレッシュトークン自体が
   失効している場合): Windows のバルーン通知 "S3VFS: AWS credentials
-  expired" が表示され、`aws sso login` (または `aws login` /
-  `s3vfs credentials set`) を再実行して再認証するよう促します。失敗
+  expired" が表示され、`aws sso login` (または `aws login`) を
+  再実行して再認証するよう促します。失敗
   リクエストの例外はそのまま呼び出し元に伝播するため、エディタ / シェル
   でも検知できます。
 
@@ -149,9 +127,9 @@ IAM Identity Center を使わない環境では、AWS CLI v2.32.0 で追加さ�
    credential_process = aws configure export-credentials --profile signin --format process
    region = us-east-1
    ```
-4. **`s3vfs.toml` から参照**。指定した名前が S3VFS DPAPI ストアにない場合、
-   S3VFS は SDK 共有プロファイルチェーンにフォールバックして
-   `credential_process` エントリを拾います:
+4. **`s3vfs.toml` から参照**。他のプロファイルと同様に名前を指定すると、
+   S3VFS は SDK 共有プロファイルチェーンから `credential_process`
+   エントリを拾います:
    ```toml
    bucket      = "my-bucket"
    root-folder = "C:/Users/you/S3VFS"

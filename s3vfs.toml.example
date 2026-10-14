@@ -42,9 +42,9 @@
 # prefix are projected into the virtualization root.
 # prefix = "team-a/"
 
-# Use credentials previously saved by `s3vfs credentials set --profile <name>`
-# (encrypted with DPAPI in Windows Credential Manager). Omit to use the AWS
-# SDK's default chain.
+# AWS shared profile (~/.aws/config, ~/.aws/credentials) to load credentials
+# from, e.g. one created by `aws configure`, `aws configure sso`, or
+# `aws login`. Omit to use the AWS SDK's default chain.
 # aws-profile = "prod"
 
 # When true, project the bucket into the virtualization root one-way: ProjFS
