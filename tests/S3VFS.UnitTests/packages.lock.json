@@ -230,7 +230,6 @@
           "Microsoft.Windows.ProjFS": "[2.1.0, )",
           "S3VFS.Core": "[0.0.1, )",
           "System.CommandLine": "[2.0.8, )",
-          "System.Security.Cryptography.ProtectedData": "[10.0.8, )",
           "Tomlyn": "[2.4.0, )"
         }
       },
@@ -313,12 +312,6 @@
         "requested": "[2.0.8, )",
         "resolved": "2.0.8",
         "contentHash": "FbpgF8p/ClXnoXEWLjQB34kNh5rsLewEgIgLyVzLDucAOQ4cNs7ec9Cam7gdKPruSb6zp4Mx8htZGTL4/5PJPg=="
-      },
-      "System.Security.Cryptography.ProtectedData": {
-        "type": "CentralTransitive",
-        "requested": "[10.0.8, )",
-        "resolved": "10.0.8",
-        "contentHash": "/ldVgSfImIBp6fLWS7sLH0BnmtFj0ZwGlZo4Xx2q0K3ZhJNDbW45kj2f6zPoC+L+BTINuHdMzTsopuwmkbgcNA=="
       },
       "Tomlyn": {
         "type": "CentralTransitive",

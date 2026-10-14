@@ -97,7 +97,7 @@ internal sealed partial class WindowsBalloonTipNotifier : ICredentialRefreshNoti
 
         var message =
             $"Could not refresh AWS credentials ({source}). " +
-            "Re-run 's3vfs credentials sso ...' (or 'aws login') to re-authenticate.";
+            "Re-run 'aws sso login' (or 'aws login') to re-authenticate.";
 
         if (!TryShowBalloon("S3VFS: AWS credentials expired", message, NiifWarning))
         {

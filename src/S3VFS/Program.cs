@@ -1,10 +1,8 @@
 using System.CommandLine;
 using S3VFS;
-using S3VFS.Credentials;
 using S3VFS.LostAndFound;
 
 var cliOptions = new MountCliOptions();
-var credentialStore = new WindowsCredentialStore();
 
 var rootCommand = new RootCommand(
     "S3VFS — S3 Virtual File System for Windows: mount a cloud object-store " +
@@ -12,9 +10,8 @@ var rootCommand = new RootCommand(
     "through s3vfs.toml / %APPDATA%\\S3VFS\\config.toml; run 's3vfs mount' to start them.");
 
 rootCommand.Subcommands.Add(HelpCommandFactory.Build(rootCommand));
-rootCommand.Subcommands.Add(CredentialsCommandFactory.Build(credentialStore));
-rootCommand.Subcommands.Add(MountCommandFactory.BuildMountCommand(credentialStore, cliOptions));
-rootCommand.Subcommands.Add(LostAndFoundCommandFactory.Build(credentialStore, cliOptions));
+rootCommand.Subcommands.Add(MountCommandFactory.BuildMountCommand(cliOptions));
+rootCommand.Subcommands.Add(LostAndFoundCommandFactory.Build(cliOptions));
 
 // A bare 's3vfs' behaves exactly like 's3vfs help'.
 rootCommand.SetAction(_ => HelpCommandFactory.ShowHelp(rootCommand, []));

@@ -1,6 +1,5 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using S3VFS.Configuration;
-using S3VFS.Credentials;
 using S3VFS.ObjectStore;
 using S3VFS.ObjectStore.S3;
 using S3VFS.Sync;
@@ -26,10 +25,9 @@ internal static class LostAndFoundCommandFactory
 {
     /// <summary>
     /// Constructs the <c>lost-and-found</c> command and its <c>list</c> / <c>diff</c> /
-    /// <c>restore</c> children. <paramref name="credentialStore"/> is consumed only by
-    /// <c>diff</c>, which has to talk to the remote backend to download the current copy.
+    /// <c>restore</c> children.
     /// </summary>
-    public static Command Build(IAwsCredentialStore credentialStore, MountCliOptions cliOptions)
+    public static Command Build(MountCliOptions cliOptions)
     {
         var command = new Command(
             "lost-and-found",
@@ -37,7 +35,7 @@ internal static class LostAndFoundCommandFactory
             ObjectStoreChangeWatcher.LostAndFoundDirectoryName +
             " when the watcher overwrote a dirty local copy with the remote version.");
         command.Subcommands.Add(BuildListCommand(cliOptions));
-        command.Subcommands.Add(BuildDiffCommand(credentialStore, cliOptions));
+        command.Subcommands.Add(BuildDiffCommand(cliOptions));
         command.Subcommands.Add(BuildRestoreCommand(cliOptions));
         return command;
     }
@@ -88,7 +86,7 @@ internal static class LostAndFoundCommandFactory
     /// for text payloads or prints a size-and-SHA-256 summary for binaries. Falls back to
     /// the binary summary when <c>git</c> is not on PATH.
     /// </summary>
-    private static Command BuildDiffCommand(IAwsCredentialStore credentialStore, MountCliOptions cliOptions)
+    private static Command BuildDiffCommand(MountCliOptions cliOptions)
     {
         var nameOption = NewMountNameOption();
         var pathArg = new Argument<string>("quarantine-file")
@@ -127,7 +125,7 @@ internal static class LostAndFoundCommandFactory
 
             try
             {
-                using var backend = BuildBackend(mount, credentialStore);
+                using var backend = BuildBackend(mount);
                 long? remoteLength;
                 try
                 {
@@ -375,11 +373,10 @@ internal static class LostAndFoundCommandFactory
     /// <see cref="MountOptionsBuilder"/> so the diff command sees the same credentials,
     /// region, endpoint, and prefix as the running mount would.
     /// </summary>
-    private static S3Backend BuildBackend(
-        S3vfsMountConfig mount, IAwsCredentialStore credentialStore)
+    private static S3Backend BuildBackend(S3vfsMountConfig mount)
     {
         var options = MountOptionsBuilder.Build(
-            mount, credentialStore, NullLogger.Instance, refreshNotifier: null);
+            mount, NullLogger.Instance, refreshNotifier: null);
         return options.CreateBackend();
     }
 
