@@ -73,8 +73,8 @@ root-folder = "C:/Users/you/S3VFS"
 に置けば:
 
 ```powershell
-s3vfs                            # 設定済みマウントを起動
-s3vfs mount-all                  # [[mount]] 配列の全マウントをこのプロセスで起動
+s3vfs help                       # 使えるコマンドとオプションを表示 (引数なしの `s3vfs` と同じ)
+s3vfs mount                      # 設定済みのマウントをすべて起動
 s3vfs mount --name personal      # 名前指定で 1 つだけ起動
 ```
 
@@ -89,8 +89,8 @@ S3VFS は意図的に**設定ファイル駆動**です。各マウントの設�
 
 | 構成要素 | 用途 |
 | --- | --- |
-| サブコマンド (`mount` / `mount-all` / `credentials` / `doctor` / `lost-and-found`) | どのマウントを起動するか、暗号化された認証情報ストアの管理、環境セルフチェック、または隔離された退避ファイルの確認・復元 |
-| `--name <mount>` | `s3vfs mount` で `[[mount]]` 配列の中から 1 つ選ぶ |
+| サブコマンド (`help` / `mount` / `credentials` / `doctor` / `lost-and-found`) | 使えるコマンドとオプションの表示 (引数なしの `s3vfs` でも表示)、どのマウントを起動するか、暗号化された認証情報ストアの管理、環境セルフチェック、または隔離された退避ファイルの確認・復元 |
+| `--name <mount>` | `s3vfs mount` で `[[mount]]` 配列の中から 1 つ選ぶ。省略時は全マウントを起動 |
 | `--verbose` / `--log-format` | デバッグ用のプロセスレベル一時上書き。TOML の `verbose` / `log-format` も引き続き有効で、両方ある場合は CLI が勝ちます |
 
 バケット内の特定のサブツリーだけを投影したい場合 (例えば
@@ -156,7 +156,7 @@ event-queue          = ""                        # SQS URL/名。events で必�
 次のように短く済みます。
 
 ```powershell
-s3vfs                       # オプションはすべて s3vfs.toml から取得
+s3vfs mount                 # オプションはすべて s3vfs.toml から取得
 ```
 
 #### 1 ファイルで複数マウント
@@ -192,11 +192,11 @@ aws-profile = "prod-readonly"
 を混在させると優先順位があいまいになるため、混在は明示的なエラーで拒否
 します。
 
-ファイルが 2 つ以上のマウントを宣言している場合、引数なしの `s3vfs` は
-どのマウントを起動すべきか判断できないので、次のいずれかを使います。
+ファイルが 2 つ以上のマウントを宣言している場合、`s3vfs mount` はすべての
+マウントを起動します。1 つだけ起動したいときは `--name` で指定します。
 
 ```powershell
-s3vfs mount-all                 # 全 [[mount]] をこのプロセスで起動
+s3vfs mount                     # 全 [[mount]] をこのプロセスで起動
 s3vfs mount --name personal     # 名前指定で 1 つだけ起動
 s3vfs mount --name work         # 同じ設定ファイル内の別マウントを起動
 ```

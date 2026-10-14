@@ -52,7 +52,7 @@ doctor が確認する項目は以下の順です。
 
 ```powershell
 s3vfs doctor --bucket $env:S3VFS_BUCKET; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-s3vfs mount-all
+s3vfs mount
 ```
 
 `NO_COLOR=1` の指定や stdout のリダイレクトでは ANSI 制御コードを

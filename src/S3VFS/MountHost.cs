@@ -6,7 +6,7 @@ namespace S3VFS;
 /// <summary>
 /// Hosts one or more <see cref="ProjFsProvider"/> instances inside a single
 /// process. Centralizes the start / wait-for-stdin / dispose lifecycle so
-/// the root command, <c>mount</c>, and <c>mount-all</c> entry points all run
+/// the root command and <c>mount</c> entry points all run
 /// the same shutdown semantics.
 /// </summary>
 internal static class MountHost

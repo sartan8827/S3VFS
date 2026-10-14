@@ -4,13 +4,15 @@
 #   * .\s3vfs.toml                       (project-local; takes precedence)
 #   * %APPDATA%\S3VFS\config.toml        (per-user, machine-global)
 #
-# Every key below mirrors a `--<flag>` option of the root `s3vfs` command.
-# CLI flags override the file per key, so you can keep stable defaults here
-# and tweak individual options at the prompt. Both kebab-case
-# (`root-folder`) and snake_case (`root_folder`) keys are accepted; kebab
-# matches the CLI flag names and is preferred.
+# Mounts are configured exclusively through this file; start them with
+# `s3vfs mount` (run `s3vfs help` to list the supported commands and options).
+# Only `verbose` and `log-format` can be overridden on the command line
+# (`--verbose`, `--log-format`), and a different config file can be selected
+# with `--config <path>`. Both kebab-case (`root-folder`) and snake_case
+# (`root_folder`) keys are accepted; kebab is preferred.
 #
-# All keys are optional. Uncomment and edit the ones you need.
+# Every key is optional except `bucket` and `root-folder`, which each mount
+# must set. Uncomment and edit the ones you need.
 #
 # Two layouts are supported:
 #   * Legacy / single-mount: keep the bucket / root-folder / per-mount keys at
@@ -22,11 +24,11 @@
 #     root would be ambiguous and are rejected at parse time.
 
 # S3 bucket projected into the virtualization root.
-# Required (here or on the CLI).
+# Required.
 # bucket = "my-bucket"
 
 # Local directory marked as the ProjFS virtualization root.
-# Required (here or on the CLI).
+# Required.
 # root-folder = "C:/Users/you/S3VFS"
 
 # Optional endpoint override for S3-compatible servers (LocalStack, MinIO, ...).
@@ -149,7 +151,7 @@
 # (verbose, log-format) stay at the top level and apply to every mount.
 #
 # Run:
-#   s3vfs mount-all              # start every [[mount]] in this process
+#   s3vfs mount                  # start every [[mount]] in this process
 #   s3vfs mount --name personal  # start a single mount by name
 #
 # 'name' must be unique within the file. Each entry takes the same per-mount

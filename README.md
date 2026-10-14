@@ -94,8 +94,8 @@ versioning turned on (see
 the full list), start the mount:
 
 ```powershell
-s3vfs                            # start the configured mount
-s3vfs mount-all                  # start every [[mount]] in the config (multi-mount form)
+s3vfs help                       # list the supported commands and options (same as bare `s3vfs`)
+s3vfs mount                      # start every configured mount
 s3vfs mount --name personal      # start one mount by name
 ```
 

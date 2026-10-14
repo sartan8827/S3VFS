@@ -53,7 +53,7 @@ also safe to wire into start-up scripts:
 
 ```powershell
 s3vfs doctor --bucket $env:S3VFS_BUCKET; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-s3vfs mount-all
+s3vfs mount
 ```
 
 `NO_COLOR=1` and redirected stdout disable the ANSI escape codes so the

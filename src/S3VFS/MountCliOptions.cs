@@ -4,8 +4,8 @@ using System.CommandLine;
 namespace S3VFS;
 
 /// <summary>
-/// Process-level CLI flags shared between the root command, <c>mount</c>, and
-/// <c>mount-all</c>. Per-mount settings (bucket, region, bandwidth limits, …)
+/// Process-level CLI flags shared between the root command and <c>mount</c>.
+/// Per-mount settings (bucket, region, bandwidth limits, …)
 /// are configured exclusively through <c>s3vfs.toml</c> /
 /// <c>%APPDATA%\S3VFS\config.toml</c>; only these few flags survive on the
 /// command line because they are useful as one-off overrides during

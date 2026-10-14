@@ -71,8 +71,8 @@ With that file in the current directory (or at
 `%APPDATA%\S3VFS\config.toml`):
 
 ```powershell
-s3vfs                            # start the configured mount
-s3vfs mount-all                  # start every [[mount]] in the config (multi-mount form)
+s3vfs help                       # list the supported commands and options (same as bare `s3vfs`)
+s3vfs mount                      # start every configured mount
 s3vfs mount --name personal      # start one mount by name
 ```
 
@@ -87,8 +87,8 @@ exposes just three things:
 
 | Surface | Purpose |
 | --- | --- |
-| Sub-commands (`mount`, `mount-all`, `credentials`, `doctor`, `lost-and-found`) | Pick which mount(s) to start, manage the encrypted credential store, run the environment self-check, or recover quarantined files. |
-| `--name <mount>` | Selects an entry from the `[[mount]]` array on `s3vfs mount`. |
+| Sub-commands (`help`, `mount`, `credentials`, `doctor`, `lost-and-found`) | Show the supported commands and options (also printed by a bare `s3vfs`), pick which mount(s) to start, manage the encrypted credential store, run the environment self-check, or recover quarantined files. |
+| `--name <mount>` | Selects a single entry from the `[[mount]]` array on `s3vfs mount`; when omitted, every entry is started. |
 | `--verbose`, `--log-format` | Process-level overrides for one-off debugging. The TOML keys (`verbose`, `log-format`) are still honoured; the CLI flags simply win when both are present. |
 
 To project only a sub-tree of a bucket — for example
@@ -156,7 +156,7 @@ accepted; kebab is preferred. With a config file in place, a typical mount
 is just:
 
 ```powershell
-s3vfs                       # all options sourced from s3vfs.toml
+s3vfs mount                 # all options sourced from s3vfs.toml
 ```
 
 #### Multiple mounts in a single config
@@ -191,11 +191,11 @@ are tagged `mount[0]`, `mount[1]`, etc. Mixing top-level mount keys with
 `[[mount]]` entries in the same file is rejected so the precedence stays
 unambiguous — pick one form per file.
 
-When a file declares 2+ mounts, the bare root command refuses to guess
-which one the operator wants. Pick one of:
+When a file declares 2+ mounts, `s3vfs mount` starts all of them unless
+`--name` narrows it down to one:
 
 ```powershell
-s3vfs mount-all                 # start every [[mount]] in this process
+s3vfs mount                     # start every [[mount]] in this process
 s3vfs mount --name personal     # start a single named mount
 s3vfs mount --name work         # start a different mount from the same config
 ```

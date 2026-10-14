@@ -24,7 +24,7 @@ internal sealed class S3vfsConfigFile
 
     /// <summary>
     /// Mount entries declared in the file. Order is preserved from the source
-    /// document so <c>mount-all</c> starts mounts in declaration order.
+    /// document so <c>mount</c> (without <c>--name</c>) starts mounts in declaration order.
     /// </summary>
     public IReadOnlyList<S3vfsMountConfig> Mounts { get; init; } = [];
 

@@ -96,8 +96,8 @@ AWS SDK のチェーンから認証情報が解決でき、バケットのバー
 次のように起動します。
 
 ```powershell
-s3vfs                            # 設定された単一マウントを起動
-s3vfs mount-all                  # 設定ファイル内の [[mount]] 全部を起動
+s3vfs help                       # 使えるコマンドとオプションを表示 (引数なしの `s3vfs` と同じ)
+s3vfs mount                      # 設定済みのマウントをすべて起動
 s3vfs mount --name personal      # 名前指定でひとつだけ起動
 ```
 
