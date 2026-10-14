@@ -1,7 +1,6 @@
 using System.CommandLine;
 using S3VFS;
 using S3VFS.Credentials;
-using S3VFS.Diagnostics;
 using S3VFS.LostAndFound;
 
 var cliOptions = new MountCliOptions();
@@ -15,7 +14,6 @@ var rootCommand = new RootCommand(
 rootCommand.Subcommands.Add(HelpCommandFactory.Build(rootCommand));
 rootCommand.Subcommands.Add(CredentialsCommandFactory.Build(credentialStore));
 rootCommand.Subcommands.Add(MountCommandFactory.BuildMountCommand(credentialStore, cliOptions));
-rootCommand.Subcommands.Add(DoctorCommandFactory.Build(credentialStore, cliOptions));
 rootCommand.Subcommands.Add(LostAndFoundCommandFactory.Build(credentialStore, cliOptions));
 
 // A bare 's3vfs' behaves exactly like 's3vfs help'.

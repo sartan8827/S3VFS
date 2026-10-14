@@ -87,7 +87,7 @@ exposes just three things:
 
 | Surface | Purpose |
 | --- | --- |
-| Sub-commands (`help`, `mount`, `credentials`, `doctor`, `lost-and-found`) | Show the supported commands and options (also printed by a bare `s3vfs`), pick which mount(s) to start, manage the encrypted credential store, run the environment self-check, or recover quarantined files. |
+| Sub-commands (`help`, `mount`, `credentials`, `lost-and-found`) | Show the supported commands and options (also printed by a bare `s3vfs`), pick which mount(s) to start, manage the encrypted credential store, or recover quarantined files. |
 | `--name <mount>` | Selects a single entry from the `[[mount]]` array on `s3vfs mount`; when omitted, every entry is started. |
 | `--verbose`, `--log-format` | Process-level overrides for one-off debugging. The TOML keys (`verbose`, `log-format`) are still honoured; the CLI flags simply win when both are present. |
 

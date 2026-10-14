@@ -95,9 +95,9 @@ chain, so there is no S3VFS-specific SSO command to learn.
    aws-profile = "prod"
    ```
 
-`s3vfs doctor --profile prod` reports the resolution path
-(e.g. `shared profile 'prod' (sso)`) so you can confirm the SDK chain is
-serving the credentials.
+At start-up `s3vfs mount` logs the resolution path
+(e.g. `using AWS credentials from shared profile 'prod' (sso)`) so you can
+confirm the SDK chain is serving the credentials.
 
 ##### Automatic refresh while mounted
 
@@ -156,7 +156,7 @@ shared-profile chain** (the AWS-recommended `credential_process` pattern).
    aws-profile = "s3vfs-login"
    ```
 
-`s3vfs doctor --profile s3vfs-login` reports the resolution path so you can
+At start-up `s3vfs mount` logs the resolution path so you can
 confirm the credentials came from the shared file (e.g.
 `shared profile 's3vfs-login' (credential_process)`) rather than the SDK
 default chain.

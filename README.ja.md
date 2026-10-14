@@ -78,7 +78,7 @@ S3 互換サービスはサポート対象外です。
 - **[認証とクレデンシャル](docs/credentials.ja.md)** — S3VFS の
   クレデンシャルストアと AWS shared profile / SSO / `aws login`。
 - **[トラブルシューティング](docs/troubleshooting.ja.md)** —
-  `s3vfs doctor` セルフチェックと `s3vfs lost-and-found` 復元 CLI。
+  起動時エラーの読み方と `s3vfs lost-and-found` 復元 CLI。
 
 ## クイックスタート
 

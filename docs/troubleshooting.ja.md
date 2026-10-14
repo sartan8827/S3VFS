@@ -2,62 +2,31 @@
 
 [← README に戻る](../README.ja.md) · [English](./troubleshooting.md)
 
-`s3vfs doctor` セルフチェックと `s3vfs lost-and-found` 退避ファイル
-復元 CLI の使い方。
+起動時エラーの読み方と `s3vfs lost-and-found` 退避ファイル復元 CLI の
+使い方。
 
 ---
 
-## doctor セルフチェック
+## 起動時のエラー
 
-マウントが起動しない (`StartVirtualizing failed`、"bucket not found"、
-"AccessDenied"、認証情報の有効期限切れ など) ときは **まず
-`s3vfs doctor` を実行してください**。doctor は読み取り専用の環境
-セルフチェックを順番に実行し、色付きのサマリーを出力します。
+マウントが起動できない場合、`s3vfs mount` は原因をログに出力して終了
+コード **2** で終了します。例外の詳細まで見たいときは `--verbose` を
+付けてください。主なメッセージは次のとおりです。
 
-```powershell
-# s3vfs.toml の最初の [[mount]] からバケット / リージョン / プロファイルを引用
-s3vfs doctor
+| ログメッセージ | 原因と対処 |
+| --- | --- |
+| `Windows ProjFS is not enabled …` / `… is disabled …` / `… only partially installed …` | Windows のオプション機能 `Client-ProjFS` が未導入または無効です。メッセージ中の `Enable-WindowsOptionalFeature` コマンドを管理者権限の PowerShell で実行してください。 |
+| `StartVirtualizing failed: <HRESULT>` | PrjFlt サービスが停止しているか、アンチウイルス / EDR にブロックされています。`sc query PrjFlt` とイベントビューアー → システムの PrjFlt エントリを確認してください。 |
+| `Mount '<name>': failed to initialize virtualization root …` | `root-folder` を作成できないか、ProjFS ルートとしてマークできません (権限不足、不正なパス、別プロバイダーが使用中のフォルダーなど)。 |
+| `Failed to read bucket versioning state for <bucket>` | 最初の S3 呼び出しが失敗しています。添付の例外に理由が出ます: 認証情報がない / 期限切れ、`AccessDenied` (`s3:GetBucketVersioning` 権限不足)、`region` / `endpoint-url` の誤り、バケットが存在しない など。 |
+| バケットバージョニングのバナー | バージョニングが Suspended または未設定です。メッセージ中の `aws s3api put-bucket-versioning` コマンドを実行してください。 |
 
-# CLI で完全に上書き (まだ設定ファイルがないとき向け)
-s3vfs doctor --bucket my-bucket --region ap-northeast-1 --profile prod
+起動時には各マウントが `Mount '<name>': using AWS credentials from <source>`
+をログに出すので、どのプロファイル / SDK チェーンから認証情報を取得したか
+を確認できます。
 
-# LocalStack / MinIO 風
-s3vfs doctor --bucket my-bucket --endpoint-url http://localhost:4566
-```
-
-doctor が確認する項目は以下の順です。
-
-1. **Windows ProjFS 機能 (`Client-ProjFS`)** — PrjFlt minifilter が
-   登録されているかと、ユーザーモード DLL `ProjectedFSLib.dll` の
-   存在を確認。`Get-WindowsOptionalFeature -FeatureName Client-ProjFS`
-   と同等の判定です。
-2. **`StartVirtualizing` スモークテスト** — 一時ディレクトリを作成し
-   仮想化ルート化、`StartVirtualizing` を試行してから片付けます。
-   レジストリ確認では拾えない「機能はインストール済みだが PrjFlt
-   サービスが停止」「EDR / アンチウイルスがブロック」といった失敗を
-   検出できます。
-3. **AWS 認証情報の解決** — S3VFS プロファイル (`--profile`) または
-   SDK チェーンから資格情報を解決し、ソース・アクセスキーの末尾 4
-   桁・一時資格情報 (セッショントークン保持) かどうかを表示します。
-4. **バケット到達性 (`HeadBucket`)** — `GetBucketLocation` を呼び
-   出します。403 はリスト権限不足、404 はリージョン違いの可能性が
-   高いです。
-5. **バケットバージョニング** — S3VFS の衝突解決に必須です。
-   未設定 / Suspended の場合は、有効化のための
-   `aws s3api put-bucket-versioning` コマンドをそのまま提示します。
-
-各行は先頭に `[OK]` / `[!!]` / `[XX]` / `[--]` (skipped) のマーカーが
-付きます。プロセスは全項目が PASS なら **0**、いずれかが要対処なら
-**2** で終了するため、起動スクリプトの先頭にも組み込めます。
-
-```powershell
-s3vfs doctor --bucket $env:S3VFS_BUCKET; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-s3vfs mount
-```
-
-`NO_COLOR=1` の指定や stdout のリダイレクトでは ANSI 制御コードを
-省略するため、ログ収集や CI のスクレイピングでも素のテキストとして
-読み込めます。
+`s3vfs mount` で複数マウントを起動していていずれかが失敗した場合、起動
+済みのマウントも停止したうえで終了コード 2 で終了します。
 
 ## 隔離された退避ファイルの確認・復元 (`lost-and-found`)
 

@@ -27,7 +27,7 @@ internal sealed class AwsCredentialSource
     /// <summary>
     /// Human-readable description of the resolution path (e.g.
     /// <c>"S3VFS profile 'prod'"</c> or <c>"shared profile 's3vfs-login' (sso)"</c>).
-    /// Surfaced by the doctor and the mount-startup log message.
+    /// Surfaced in the mount-startup log message.
     /// </summary>
     public string Description { get; }
 

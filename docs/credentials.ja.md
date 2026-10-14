@@ -96,8 +96,8 @@ AWS IAM Identity Center (旧 AWS SSO) を利用する環境では、AWS CLI 標�
    aws-profile = "prod"
    ```
 
-`s3vfs doctor --profile prod` で解決経路 (例: `shared profile 'prod' (sso)`)
-を確認できます。SDK チェーンが SSO 経由で配っていることがログから
+`s3vfs mount` は起動時に解決経路 (例: `using AWS credentials from shared profile 'prod' (sso)`)
+をログに出力します。SDK チェーンが SSO 経由で配っていることがログから
 判別できます。
 
 ##### マウント中の自動再認証
@@ -158,7 +158,7 @@ IAM Identity Center を使わない環境では、AWS CLI v2.32.0 で追加さ�
    aws-profile = "s3vfs-login"
    ```
 
-`s3vfs doctor --profile s3vfs-login` は解決経路 (例:
-`shared profile 's3vfs-login' (credential_process)`) を表示するため、SDK
+`s3vfs mount` は起動時に解決経路 (例:
+`shared profile 's3vfs-login' (credential_process)`) をログに出力するため、SDK
 デフォルトチェーンではなく共有ファイルから取得できているかを確認できます。
 
