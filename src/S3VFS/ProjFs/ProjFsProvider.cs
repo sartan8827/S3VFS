@@ -2,7 +2,6 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Windows.ProjFS;
 using S3VFS.Configuration;
-using S3VFS.Diagnostics;
 using S3VFS.ObjectStore;
 using S3VFS.ObjectStore.S3;
 using S3VFS.Sync;
@@ -141,7 +140,10 @@ internal sealed class ProjFsProvider : IRequiredCallbacks, IDisposable
         var hr = virtualizationInstance.StartVirtualizing(this);
         if (hr != HResult.Ok)
         {
-            logger.LogError("StartVirtualizing failed: {HResult}", hr);
+            logger.LogError(
+                "StartVirtualizing failed: {HResult}. The PrjFlt service may be stopped or blocked " +
+                "by antivirus / EDR; check 'sc query PrjFlt' and Event Viewer → System for PrjFlt entries.",
+                hr);
             return false;
         }
         virtualizationInstanceStarted = true;

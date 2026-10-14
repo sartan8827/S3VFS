@@ -75,8 +75,8 @@ The detailed reference is split into focused pages under
   user-metadata round-trip.
 - **[Authentication and credentials](docs/credentials.md)** — the S3VFS
   credential store and AWS shared profile / SSO / `aws login`.
-- **[Troubleshooting](docs/troubleshooting.md)** — the `s3vfs doctor`
-  self-check and the `s3vfs lost-and-found` recovery CLI.
+- **[Troubleshooting](docs/troubleshooting.md)** — reading start-up
+  errors and the `s3vfs lost-and-found` recovery CLI.
 
 ## Quick start
 
@@ -94,8 +94,8 @@ versioning turned on (see
 the full list), start the mount:
 
 ```powershell
-s3vfs                            # start the configured mount
-s3vfs mount-all                  # start every [[mount]] in the config (multi-mount form)
+s3vfs help                       # list the supported commands and options (same as bare `s3vfs`)
+s3vfs mount                      # start every configured mount
 s3vfs mount --name personal      # start one mount by name
 ```
 

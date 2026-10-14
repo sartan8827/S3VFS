@@ -2,62 +2,29 @@
 
 [← Back to README](../README.md) · [日本語版](./troubleshooting.ja.md)
 
-The `s3vfs doctor` self-check and the `s3vfs lost-and-found` recovery CLI.
+How to read start-up errors and the `s3vfs lost-and-found` recovery CLI.
 
 ---
 
-## Doctor self-check
+## Start-up errors
 
-When a mount refuses to start — `StartVirtualizing failed`, "bucket not
-found", "AccessDenied", credentials expired — **run `s3vfs doctor`
-first**. The doctor performs a fixed sequence of read-only environment
-checks and prints a colored summary:
+When a mount refuses to start, `s3vfs mount` logs the cause and exits with
+code **2**. Add `--verbose` for the full exception detail. Common messages:
 
-```powershell
-# Use the first [[mount]] in s3vfs.toml as the bucket / region / profile context
-s3vfs doctor
+| Log message | Cause and fix |
+| --- | --- |
+| `Windows ProjFS is not enabled …` / `… is disabled …` / `… only partially installed …` | The `Client-ProjFS` optional feature is missing or disabled. Run the `Enable-WindowsOptionalFeature` command printed in the message from an elevated PowerShell. |
+| `StartVirtualizing failed: <HRESULT>` | The PrjFlt service is stopped or blocked by antivirus / EDR. Check `sc query PrjFlt` and Event Viewer → System for PrjFlt entries. |
+| `Mount '<name>': failed to initialize virtualization root …` | The `root-folder` could not be created or marked as a ProjFS root (permissions, invalid path, or a folder already owned by another provider). |
+| `Failed to read bucket versioning state for <bucket>` | The first S3 call failed. The attached exception says why: missing / expired credentials, `AccessDenied` (the principal lacks `s3:GetBucketVersioning`), a wrong `region` / `endpoint-url`, or a bucket that does not exist. |
+| Bucket versioning banner | Versioning is suspended or was never enabled. Run the `aws s3api put-bucket-versioning` command printed in the message. |
 
-# Override the context entirely (handy when you have no config yet)
-s3vfs doctor --bucket my-bucket --region eu-central-1 --profile prod
+Each mount also logs `Mount '<name>': using AWS credentials from <source>`
+at start-up, so you can confirm which profile or SDK chain entry supplied
+the credentials.
 
-# LocalStack / MinIO style
-s3vfs doctor --bucket my-bucket --endpoint-url http://localhost:4566
-```
-
-The doctor verifies, in order:
-
-1. **Windows ProjFS feature (`Client-ProjFS`)** — registry check that the
-   PrjFlt minifilter is registered and the user-mode `ProjectedFSLib.dll`
-   is present. Equivalent to
-   `Get-WindowsOptionalFeature -FeatureName Client-ProjFS`.
-2. **`StartVirtualizing` smoke test** — creates a throwaway directory,
-   marks it as a virtualization root, calls `StartVirtualizing`, then
-   tears everything down. Catches "feature installed but PrjFlt service
-   stopped" and EDR / antivirus interference that the registry check
-   cannot see.
-3. **AWS credentials resolution** — resolves credentials from the S3VFS
-   profile (`--profile`) or the SDK chain, reports the source and the
-   last 4 chars of the access key id, and flags whether the credentials
-   are temporary (session-token bearing).
-4. **Bucket access (`HeadBucket`)** — calls `GetBucketLocation`. A 403
-   means the principal can't list the bucket; a 404 typically means the
-   region is wrong.
-5. **Bucket versioning** — required by S3VFS for safe conflict
-   resolution. Reports the exact `aws s3api put-bucket-versioning`
-   command when the bucket has versioning suspended or never enabled.
-
-Each row is prefixed by `[OK]`, `[!!]`, `[XX]`, or `[--]` (skipped). The
-process exits **0** when every check passes (skips and warnings do not
-count) and **2** when any check needs operator action, so the doctor is
-also safe to wire into start-up scripts:
-
-```powershell
-s3vfs doctor --bucket $env:S3VFS_BUCKET; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-s3vfs mount-all
-```
-
-`NO_COLOR=1` and redirected stdout disable the ANSI escape codes so the
-output stays clean for log shippers and CI.
+When `s3vfs mount` starts several mounts and one of them fails, the mounts
+that already started are shut down and the process exits with code 2.
 
 ## Recovering quarantined files (`lost-and-found`)
 

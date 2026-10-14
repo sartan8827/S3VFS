@@ -15,7 +15,7 @@ ad-hoc override) to switch to a structured stream that log shippers such
 as Datadog or Loki can parse without regex:
 
 ```powershell
-s3vfs --log-format json    # one-off override; the file value applies otherwise
+s3vfs mount --log-format json    # one-off override; the file value applies otherwise
 ```
 
 Each log entry is written as a single line (terminated with the platform

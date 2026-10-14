@@ -6,7 +6,7 @@ namespace S3VFS;
 /// <summary>
 /// Hosts one or more <see cref="ProjFsProvider"/> instances inside a single
 /// process. Centralizes the start / wait-for-stdin / dispose lifecycle so
-/// the root command, <c>mount</c>, and <c>mount-all</c> entry points all run
+/// the root command and <c>mount</c> entry points all run
 /// the same shutdown semantics.
 /// </summary>
 internal static class MountHost
@@ -30,6 +30,15 @@ internal static class MountHost
         ILoggerFactory loggerFactory,
         ILogger logger)
     {
+        // Check the ProjFS feature up front: without it the provider constructor
+        // fails with a bare DllNotFoundException / HRESULT that doesn't tell the
+        // operator what to do.
+        if (ProjFsFeature.GetProblem() is { } projFsProblem)
+        {
+            logger.LogError("{Message}", projFsProblem);
+            return ExitGeneralException;
+        }
+
         var providers = new List<(string Name, ProjFsProvider Provider)>(mounts.Count);
         var failed = false;
         try
@@ -40,15 +49,27 @@ internal static class MountHost
                 // which mount each line came from. The category is also threaded
                 // into the backend so SDK-level log entries inherit it.
                 var mountLogger = loggerFactory.CreateLogger($"S3VFS.Mount.{mount.Name}");
-                var provider = new ProjFsProvider(
-                    mount.Options,
-                    loggerFactory.CreateLogger<ProjFsProvider>(),
-                    loggerFactory);
+                ProjFsProvider provider;
+                try
+                {
+                    provider = new ProjFsProvider(
+                        mount.Options,
+                        loggerFactory.CreateLogger<ProjFsProvider>(),
+                        loggerFactory);
+                }
+                catch (Exception ex)
+                {
+                    mountLogger.LogError(
+                        ex, "Mount '{Mount}': failed to initialize virtualization root {Root}: {Reason}",
+                        mount.Name, mount.Options.VirtRoot, ex.Message);
+                    failed = true;
+                    continue;
+                }
                 providers.Add((mount.Name, provider));
                 if (!provider.StartVirtualization())
                 {
                     mountLogger.LogError(
-                        "Mount '{Mount}': failed to start virtualization at {Root}.",
+                        "Mount '{Mount}': failed to start virtualization at {Root}. See the error above for the cause.",
                         mount.Name, mount.Options.VirtRoot);
                     failed = true;
                     continue;
