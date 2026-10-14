@@ -10,9 +10,7 @@ namespace OSVFS.Sync;
 /// quarantining any dirty local copies before they are overwritten. Implements
 /// the "Changes in your bucket automatically appear in your file system" behavior
 /// described in the AWS S3 Files spec, including the "remote bucket is the source
-/// of truth" conflict policy. The same machinery applies unchanged to GCS and
-/// Azure Blob backends once they implement
-/// <see cref="IObjectStoreBackend"/>.
+/// of truth" conflict policy.
 /// </summary>
 /// <remarks>
 /// Discovery is the change source's responsibility. Polling-based discovery

@@ -8,15 +8,6 @@
     <PackageVersion Include="AWSSDK.SQS" Version="4.0.2.31" />
     <PackageVersion Include="AWSSDK.SSO" Version="4.0.2.30" />
     <PackageVersion Include="AWSSDK.SSOOIDC" Version="4.0.3.31" />
-    <!-- Azure Storage SDKs follow the SDK's newest default x-ms-version in
-         production. The IntegrationTests/AzuriteFixture pins ServiceVersion via
-         BlobClientOptions / QueueClientOptions to whatever the running Azurite
-         image still supports, so Dependabot can roll these forward without
-         breaking the IT. Update the pinned ServiceVersion in AzuriteFixture
-         when Azurite ships support for a higher API version. -->
-    <PackageVersion Include="Azure.Storage.Blobs" Version="12.28.0" />
-    <PackageVersion Include="Azure.Storage.Queues" Version="12.26.0" />
-    <PackageVersion Include="Azure.Identity" Version="1.21.0" />
     <PackageVersion Include="Microsoft.Extensions.TimeProvider.Testing" Version="10.6.0" />
     <PackageVersion Include="OpenTelemetry" Version="1.15.3" />
     <PackageVersion Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.15.3" />
@@ -34,6 +25,5 @@
     <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
     <PackageVersion Include="Testcontainers" Version="4.12.0" />
     <PackageVersion Include="Testcontainers.LocalStack" Version="4.12.0" />
-    <PackageVersion Include="Testcontainers.Azurite" Version="4.12.0" />
   </ItemGroup>
 </Project>

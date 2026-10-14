@@ -4,9 +4,7 @@ namespace OSVFS.ObjectStore;
 
 /// <summary>
 /// Conversion helpers between Windows-style relative paths and object-store keys.
-/// Forward-slash key separators are the convention shared by S3, GCS, and Azure Blob
-/// (Azure uses them as virtual path separators inside flat blob names), so this util
-/// is provider-neutral.
+/// Object keys use forward-slash separators.
 /// </summary>
 internal static class KeyPath
 {

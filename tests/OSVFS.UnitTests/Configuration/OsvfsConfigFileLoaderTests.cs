@@ -15,7 +15,6 @@ public class OsvfsConfigFileLoaderTests
     public void Parse_legacy_single_mount_form_returns_one_default_mount_with_all_keys()
     {
         const string toml = """
-            provider = "s3"
             bucket = "my-bucket"
             root-folder = "C:/mount"
             endpoint-url = "http://localhost:4566"
@@ -41,7 +40,6 @@ public class OsvfsConfigFileLoaderTests
         Assert.Equal(LogFormat.Json, config.LogFormat);
         var mount = Assert.Single(config.Mounts);
         Assert.Equal(OsvfsConfigFileLoader.LegacyDefaultMountName, mount.Name);
-        Assert.Equal(ObjectStoreProvider.S3, mount.Provider);
         Assert.Equal("my-bucket", mount.Bucket);
         Assert.Equal("C:/mount", mount.RootFolder);
         Assert.Equal("http://localhost:4566", mount.EndpointUrl);
@@ -134,22 +132,6 @@ public class OsvfsConfigFileLoaderTests
 
         var mount = Assert.Single(config.Mounts);
         Assert.Equal("kebab", mount.RootFolder);
-    }
-
-    [Fact]
-    public void Parse_provider_is_case_insensitive()
-    {
-        var config = OsvfsConfigFileLoader.ParseContent("provider = \"S3\"", "test.toml");
-        var mount = Assert.Single(config.Mounts);
-        Assert.Equal(ObjectStoreProvider.S3, mount.Provider);
-    }
-
-    [Fact]
-    public void Parse_unknown_provider_throws()
-    {
-        var ex = Assert.Throws<OsvfsConfigException>(() =>
-            OsvfsConfigFileLoader.ParseContent("provider = \"sftp\"", "test.toml"));
-        Assert.Contains("sftp", ex.Message, StringComparison.Ordinal);
     }
 
     [Fact]

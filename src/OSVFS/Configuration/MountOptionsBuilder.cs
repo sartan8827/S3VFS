@@ -1,9 +1,7 @@
-using Azure.Identity;
 using Microsoft.Extensions.Logging;
 using OSVFS.Credentials;
 using OSVFS.Net;
 using OSVFS.ObjectStore;
-using OSVFS.ObjectStore.AzureBlob;
 
 namespace OSVFS.Configuration;
 
@@ -57,12 +55,8 @@ internal static class MountOptionsBuilder
                 "[[mount]] table.");
         }
 
-        IObjectStoreCredentialSource? credentials = (mount.Provider ?? ObjectStoreProvider.S3) switch
-        {
-            ObjectStoreProvider.AzureBlob => ResolveAzureCredential(mount, logger),
-            _ => ResolveCredential(
-                credentialStore, sharedProfileResolver, mount.AwsProfile, mount.Name, logger),
-        };
+        var credentials = ResolveCredential(
+            credentialStore, sharedProfileResolver, mount.AwsProfile, mount.Name, logger);
 
         BandwidthLimits bandwidthLimits;
         long? multipartThresholdBytes;
@@ -80,9 +74,8 @@ internal static class MountOptionsBuilder
             throw new OsvfsConfigException($"Mount '{mount.Name}': {ex.Message}", ex);
         }
 
-        var multipartCapabilities = MultipartCapabilities.For(mount.Provider ?? ObjectStoreProvider.S3);
         if (MultipartSettingsValidator.Validate(
-                multipartThresholdBytes, multipartPartSizeBytes, multipartCapabilities) is { } error)
+                multipartThresholdBytes, multipartPartSizeBytes) is { } error)
         {
             throw new OsvfsConfigException($"Mount '{mount.Name}': {error}");
         }
@@ -125,7 +118,6 @@ internal static class MountOptionsBuilder
 
         return new ProjFsProviderOptions
         {
-            Provider = mount.Provider ?? ObjectStoreProvider.S3,
             Bucket = mount.Bucket,
             VirtRoot = mount.RootFolder,
             EndpointUrl = mount.EndpointUrl,
@@ -164,99 +156,6 @@ internal static class MountOptionsBuilder
     /// Both misses are reported as a single <see cref="OsvfsConfigException"/> so
     /// multi-mount runs surface which entry blew up.
     /// </summary>
-    /// <summary>
-    /// Resolves the Azure Blob credential source from the mount config. Picks
-    /// exactly one of the four supported branches:
-    /// <list type="bullet">
-    ///   <item><c>connection-string</c></item>
-    ///   <item><c>account-name</c> + <c>sas</c></item>
-    ///   <item><c>account-name</c> + <c>managed-identity = true</c></item>
-    ///   <item><c>account-name</c> + <c>default-azure-credential = true</c></item>
-    /// </list>
-    /// Throws <see cref="OsvfsConfigException"/> when none of the branches
-    /// match or when more than one is present, so the operator gets a clear
-    /// startup error instead of an opaque downstream Azure SDK failure.
-    /// </summary>
-    private static AzureCredentialSource? ResolveAzureCredential(
-        OsvfsMountConfig mount, ILogger logger)
-    {
-        var hasConnectionString = !string.IsNullOrEmpty(mount.ConnectionString);
-        var hasSas = !string.IsNullOrEmpty(mount.Sas);
-        var hasManagedIdentity = mount.ManagedIdentity == true;
-        var hasDefaultAzureCredential = mount.DefaultAzureCredential == true;
-
-        var configured =
-            (hasConnectionString ? 1 : 0) +
-            (hasSas ? 1 : 0) +
-            (hasManagedIdentity ? 1 : 0) +
-            (hasDefaultAzureCredential ? 1 : 0);
-
-        if (configured == 0)
-        {
-            throw new OsvfsConfigException(
-                $"Mount '{mount.Name}': Azure Blob backend requires exactly one of " +
-                "'connection-string', 'sas', 'managed-identity', or 'default-azure-credential' " +
-                "in osvfs.toml.");
-        }
-        if (configured > 1)
-        {
-            throw new OsvfsConfigException(
-                $"Mount '{mount.Name}': Azure Blob backend accepts exactly one credential branch — " +
-                "only one of 'connection-string', 'sas', 'managed-identity', or 'default-azure-credential' " +
-                "may be set per mount.");
-        }
-
-        // Connection string carries its own account name + endpoint.
-        if (hasConnectionString)
-        {
-            logger.LogInformation(
-                "Mount '{Mount}': using Azure credentials from connection string.", mount.Name);
-            return AzureCredentialSource.FromConnectionString(
-                mount.ConnectionString!, "Azure connection string");
-        }
-
-        // The remaining three branches need an explicit account name to build
-        // the service endpoint URL.
-        if (string.IsNullOrEmpty(mount.AccountName))
-        {
-            throw new OsvfsConfigException(
-                $"Mount '{mount.Name}': Azure Blob backend requires 'account-name' alongside " +
-                "'sas' / 'managed-identity' / 'default-azure-credential'.");
-        }
-
-        if (hasSas)
-        {
-            var description = $"Azure SAS for '{mount.AccountName}'";
-            logger.LogInformation(
-                "Mount '{Mount}': using Azure credentials from {Source}.", mount.Name, description);
-            return AzureCredentialSource.FromSas(mount.AccountName, mount.Sas!, description);
-        }
-
-        if (hasManagedIdentity)
-        {
-            var description = $"Azure Managed Identity for '{mount.AccountName}'";
-            logger.LogInformation(
-                "Mount '{Mount}': using Azure credentials from {Source}.", mount.Name, description);
-            // Azure.Identity 1.21 deprecated the legacy parameterless / clientId
-            // constructors in favour of the typed ManagedIdentityId factories.
-            // Pass SystemAssigned explicitly — it matches the previous default
-            // behaviour without tripping the CS0618 obsolete warning.
-            return AzureCredentialSource.FromTokenCredential(
-                mount.AccountName,
-                new ManagedIdentityCredential(ManagedIdentityId.SystemAssigned),
-                description);
-        }
-
-        // hasDefaultAzureCredential
-        {
-            var description = $"Azure DefaultAzureCredential chain for '{mount.AccountName}'";
-            logger.LogInformation(
-                "Mount '{Mount}': using Azure credentials from {Source}.", mount.Name, description);
-            return AzureCredentialSource.FromTokenCredential(
-                mount.AccountName, new DefaultAzureCredential(), description);
-        }
-    }
-
     private static AwsCredentialSource? ResolveCredential(
         IAwsCredentialStore store,
         ISharedProfileResolver sharedProfileResolver,

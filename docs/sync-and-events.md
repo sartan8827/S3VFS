@@ -3,10 +3,8 @@
 [← Back to README](../README.md) · [日本語版](./sync-and-events.ja.md)
 
 How OSVFS picks up remote changes (polling vs. event-driven), how often it
-reconciles, and how to flip a mount into read-only mode. AWS S3 uses
-EventBridge → SQS for push-mode notifications; Azure Blob uses Event Grid
-→ Storage Queue (see [Authentication and credentials](./credentials.md)
-for queue auth).
+reconciles, and how to flip a mount into read-only mode. Push-mode
+notifications use S3 → EventBridge → SQS.
 
 ---
 

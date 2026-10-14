@@ -13,10 +13,8 @@ OSVFS はクラウドオブジェクトストレージのバケットを Windows
 標準搭載されているため、OSVFS の利用にあたって WinFsp などのサードパーティ
 製カーネルドライバを別途インストールする必要はありません。
 
-現在のビルドには **Amazon S3 と Azure Blob Storage** のバックエンドが
-同梱されています。**Google Cloud Storage** も同じ `provider` フラグの
-下で対応予定です。詳細は下の[対応バックエンド](#対応バックエンド)を
-参照してください。
+対応しているバックエンドは **Amazon S3** のみです。詳細は下の
+[対応バックエンド](#対応バックエンド)を参照してください。
 
 [projfs]: https://learn.microsoft.com/en-us/windows/win32/projfs/projected-file-system
 
@@ -47,7 +45,7 @@ ProjFS が担い、`osvfs` 自体は通常のユーザーモードプロセス�
 | 配布物 | 単一の署名済み `osvfs.exe` (Native AOT) | `rclone.exe` + WinFsp MSI |
 | AppLocker / WDAC との相性 | サードパーティ製カーネルドライバを許可リストに入れる必要なし | WinFsp カーネルドライバをポリシー上で許可する必要あり |
 | エクスプローラー統合 | ネイティブな ProjFS プレースホルダー (OneDrive と同じ "online-only" モデル) | FUSE ライクなマウント。ファイルは常に実体ありのように見える |
-| 対応バックエンド (現在) | S3 + Azure Blob (GCS は同じ `provider` 抽象化の下で対応予定) | 70 種類以上 |
+| 対応バックエンド | Amazon S3 のみ | 70 種類以上 |
 | ランタイム依存 | なし (Native AOT) | なし (Go の単一バイナリ) |
 
 OSVFS が未対応のバックエンドを使いたい場合は、引き続き rclone を選んで
@@ -57,17 +55,11 @@ OSVFS が選択肢になります。
 
 ## 対応バックエンド
 
-OSVFS は provider-neutral な
-[`IObjectStoreBackend`](src/OSVFS.Core/ObjectStore/IObjectStoreBackend.cs)
-抽象化の上に構築されており、起動時の `provider` フラグでバックエンドを
-切り替えます。マルチクラウド対応は本プロジェクトの明示的なゴールであり、
-「後で拡張できるように抽象化だけ残してある」という位置づけではありません。
-
-| プロバイダー | `provider` の値 | 状態 |
-| --- | --- | --- |
-| Amazon S3 (および S3 互換: MinIO / Cloudflare R2 / Wasabi / Backblaze B2 / Ceph など) | `s3` | **対応済み** |
-| Azure Blob Storage | `azureblob` | **対応済み** |
-| Google Cloud Storage | `gcs` | 対応予定 |
+OSVFS の対象は **Amazon S3** のみです。S3 の実装は
+[`S3Backend`](src/OSVFS.Core/ObjectStore/S3/S3Backend.cs) にあり、push 型の
+変更通知は S3 → EventBridge → SQS を使います。`endpoint-url` キーは主に
+インテグレーションテストを LocalStack に向けるためのもので、その他の
+S3 互換サービスはサポート対象外です。
 
 ## ドキュメント
 
@@ -80,13 +72,12 @@ OSVFS は provider-neutral な
   リトライポリシー。
 - **[同期と変更イベント](docs/sync-and-events.ja.md)** — ポーリング /
   push モードの変更検出、オンデマンド同期、読み取り専用マウント、
-  SQS / Event Grid の構成。
+  SQS の構成。
 - **[可観測性](docs/observability.ja.md)** — 構造化ログ、OpenTelemetry
   トレース / メトリクス、ローカル Prometheus リスナー、ユーザー定義
   メタデータの往復保持。
-- **[認証とクレデンシャル](docs/credentials.ja.md)** — AWS shared profile
-  / SSO / `aws login` と Azure の 4 認証ブランチ (connection string /
-  SAS / Managed Identity / DefaultAzureCredential)。
+- **[認証とクレデンシャル](docs/credentials.ja.md)** — OSVFS の
+  クレデンシャルストアと AWS shared profile / SSO / `aws login`。
 - **[トラブルシューティング](docs/troubleshooting.ja.md)** —
   `osvfs doctor` セルフチェックと `osvfs lost-and-found` 復元 CLI。
 
@@ -112,9 +103,6 @@ osvfs mount --name personal      # 名前指定でひとつだけ起動
 ```
 
 仮想化ルートをエクスプローラーで開くと、バケットの中身が見えます。
-Azure Blob (`provider = "azureblob"`) を使う場合は
-[認証とクレデンシャル → Azure Blob の設定](docs/credentials.ja.md#azure-blob-の設定)
-を参照してください。
 
 ## アーキテクチャ
 
@@ -157,7 +145,7 @@ Microsoft が OS 標準で提供している ProjFS フィルタードライバ�
   — ローカルでの書き込み / 削除 / リネームを ProjFS の通知から受け取り、
   オブジェクトストアバックエンドに転送します。
 - [`S3Backend`](src/OSVFS.Core/ObjectStore/S3/S3Backend.cs) — AWSSDK.S3 を
-  プロバイダーニュートラルな [`IObjectStoreBackend`](src/OSVFS.Core/ObjectStore/IObjectStoreBackend.cs)
+  [`IObjectStoreBackend`](src/OSVFS.Core/ObjectStore/IObjectStoreBackend.cs)
   の背後に置き、ProjFS プロバイダーが必要とする最小限の API (list / head /
   range read / upload / delete / copy ベースの rename) にラップします。
   `multipart-threshold` (既定 16 MiB) 以上のアップロードは `TransferUtility`
@@ -215,28 +203,15 @@ dotnet publish src\OSVFS -c Release -r win-x64 -o publish\win-x64
 # ユニットテスト (Windows / Linux どちらでも実行可能)
 dotnet test tests\OSVFS.Core.UnitTests
 
-# LocalStack + Azurite に対するインテグレーションテスト (Docker が必要)
+# LocalStack に対するインテグレーションテスト (Docker が必要)
 dotnet test tests\OSVFS.Core.IntegrationTests
 ```
 
 インテグレーションテストプロジェクトは `net10.0` をターゲットとし、クロスプラッ
 トフォームな `OSVFS.Core` のみを参照しているため、Linux CI 上でも
 [Testcontainers](https://dotnet.testcontainers.org/) と
-[LocalStack](https://github.com/localstack/localstack) /
-[Azurite](https://learn.microsoft.com/ja-jp/azure/storage/common/storage-use-azurite)
+[LocalStack](https://github.com/localstack/localstack)
 を使ってビルド・実行できます。
-
-> **Azurite ServiceVersion の pin 運用について。** Azure SDK は新しい
-> リリースのたびにデフォルトの `x-ms-version` を更新しますが、Azurite の
-> 対応はそれより数か月遅れます。Dependabot が `Azure.Storage.Blobs` /
-> `Azure.Storage.Queues` を継続的に更新できるよう、インテグレーション
-> テストでは `BlobClientOptions.ServiceVersion` /
-> `QueueClientOptions.ServiceVersion` を Azurite "latest" イメージが
-> 解釈できる範囲に pin しています。本番側のコードパスでは options を
-> null にして SDK のデフォルト最新版を使います。Azurite が新しい API
-> バージョンに対応した際は、
-> [`tests/OSVFS.Core.IntegrationTests/AzuriteFixture.cs`](tests/OSVFS.Core.IntegrationTests/AzuriteFixture.cs)
-> の定数を更新してください。
 
 ## なぜ C# (.NET) で実装しているのか？
 

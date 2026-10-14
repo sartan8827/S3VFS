@@ -75,20 +75,6 @@ public class BucketVersioningGuardTests
     }
 
     [Fact]
-    public void Exception_message_uses_backend_supplied_instructions_verbatim()
-    {
-        // A different backend (e.g. Azure Blob) returns its own remediation copy;
-        // the exception must drop it in unmodified rather than hard-coding AWS wording.
-        const string AzureLikeInstructions =
-            "  az storage account blob-service-properties update --enable-versioning true ...";
-        var ex = new BucketVersioningNotEnabledException(
-            Bucket, BucketVersioningStatus.NotEnabled, AzureLikeInstructions);
-
-        Assert.Contains(AzureLikeInstructions, ex.Message, StringComparison.Ordinal);
-        Assert.DoesNotContain("aws s3api", ex.Message, StringComparison.Ordinal);
-    }
-
-    [Fact]
     public void Exception_message_reports_observed_status()
     {
         var ex = new BucketVersioningNotEnabledException(

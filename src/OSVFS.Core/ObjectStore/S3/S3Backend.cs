@@ -56,9 +56,7 @@ internal sealed class S3Backend : IObjectStoreBackend, IDisposable
 
     /// <summary>
     /// Combined UTF-8 byte limit for user-defined metadata names+values
-    /// enforced by S3 (<c>x-amz-meta-*</c> headers): 2 KiB per object. Azure
-    /// Blob and GCS use larger ceilings (8 KiB), which is why this lives in
-    /// the S3-specific surface rather than on the cross-provider helper.
+    /// enforced by S3 (<c>x-amz-meta-*</c> headers): 2 KiB per object.
     /// </summary>
     public const int UserMetadataMaxByteCount = 2 * 1024;
 

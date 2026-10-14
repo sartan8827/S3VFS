@@ -3,9 +3,8 @@
 [← README に戻る](../README.ja.md) · [English](./sync-and-events.md)
 
 OSVFS のリモート変更検出 (ポーリング / イベント駆動)、整合性チェックの
-間隔、読み取り専用マウントへの切替方法。AWS S3 は EventBridge → SQS、
-Azure Blob は Event Grid → Storage Queue を使います (キュー側の認証は
-[認証とクレデンシャル](./credentials.ja.md) を参照)。
+間隔、読み取り専用マウントへの切替方法。push 型の通知には
+S3 → EventBridge → SQS を使います。
 
 ---
 

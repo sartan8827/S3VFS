@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using OSVFS.Configuration;
 using OSVFS.Credentials;
 using OSVFS.ObjectStore;
+using OSVFS.ObjectStore.S3;
 using OSVFS.Sync;
 using OSVFS.Sync.ProjFs;
 using System.CommandLine;
@@ -355,7 +356,7 @@ internal static class LostAndFoundCommandFactory
     /// longer exists on the remote.
     /// </summary>
     private static long? DownloadRemote(
-        IObjectStoreBackend backend, string originalRelativePath, string localPath)
+        S3Backend backend, string originalRelativePath, string localPath)
     {
         var info = backend.HeadAsync(originalRelativePath, CancellationToken.None)
             .GetAwaiter().GetResult();
@@ -374,26 +375,12 @@ internal static class LostAndFoundCommandFactory
     /// <see cref="MountOptionsBuilder"/> so the diff command sees the same credentials,
     /// region, endpoint, and prefix as the running mount would.
     /// </summary>
-    private static IObjectStoreBackend BuildBackend(
+    private static S3Backend BuildBackend(
         OsvfsMountConfig mount, IAwsCredentialStore credentialStore)
     {
         var options = MountOptionsBuilder.Build(
             mount, credentialStore, NullLogger.Instance, refreshNotifier: null);
-        return ObjectStoreBackendFactory.Create(
-            options.Provider,
-            options.Bucket,
-            options.EndpointUrl,
-            options.KeyPrefix,
-            options.Region,
-            options.Credentials,
-            options.BandwidthLimits,
-            options.MultipartThresholdBytes,
-            options.MultipartPartSizeBytes,
-            options.RetryMaxAttempts,
-            options.MaxConcurrentUploads,
-            options.MaxConcurrentDownloads,
-            options.MaxMultipartParts,
-            options.RefreshNotifier);
+        return options.CreateBackend();
     }
 
     /// <summary>

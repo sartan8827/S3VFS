@@ -37,8 +37,7 @@ internal sealed class BucketVersioningNotEnabledException : Exception
     /// Renders the operator-facing remediation message. Kept on a static helper
     /// so unit tests can assert against the exact wording without instantiating
     /// the exception. <paramref name="enableVersioningInstructions"/> comes from
-    /// the active backend (<c>S3</c>: AWS CLI; future <c>azureblob</c> /
-    /// <c>gcs</c>: their respective CLIs) and is dropped in verbatim — it is
+    /// the backend (AWS CLI commands) and is dropped in verbatim — it is
     /// already indented for this message.
     /// </summary>
     public static string BuildMessage(

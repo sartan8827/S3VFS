@@ -48,8 +48,7 @@ internal interface IObjectStoreBackend : IDisposable
     /// <summary>
     /// Combined UTF-8 byte ceiling for user-defined metadata names+values that
     /// the provider accepts on a single object. Surfaced so callers can
-    /// pre-validate against the right limit (S3: 2 KiB <c>x-amz-meta-*</c>;
-    /// Azure Blob: 8 KiB <c>x-ms-meta-*</c>; GCS: 8 KiB metadata block) before
+    /// pre-validate against the limit (S3: 2 KiB <c>x-amz-meta-*</c>) before
     /// initiating an upload.
     /// </summary>
     int UserMetadataMaxBytes { get; }

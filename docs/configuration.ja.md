@@ -3,10 +3,8 @@
 [← README に戻る](../README.ja.md) · [English](./configuration.md)
 
 OSVFS の必要環境、マウントの起動方法、CLI の最小表面、TOML 設定ファイルの
-全キーリファレンス (マルチマウント含む) をまとめます。Azure 固有のキー
-(`account-name` / `sas` / `managed-identity` / `default-azure-credential` /
-`connection-string`) は [認証とクレデンシャル](./credentials.ja.md) を
-参照してください。
+全キーリファレンス (マルチマウント含む) をまとめます。AWS 認証情報の
+解決方法は [認証とクレデンシャル](./credentials.ja.md) を参照してください。
 
 ---
 
@@ -125,7 +123,6 @@ OSVFS は意図的に**設定ファイル駆動**です。各マウントの設�
 
 ```toml
 # ./osvfs.toml もしくは %APPDATA%\OSVFS\config.toml
-provider             = "s3"
 bucket               = "my-bucket"
 root-folder          = "C:/Users/you/OSVFS"
 endpoint-url         = "http://localhost:4566"   # 任意

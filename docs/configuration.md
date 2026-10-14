@@ -4,8 +4,7 @@
 
 This page covers OSVFS prerequisites, how to start a mount, the small CLI
 surface, and the full TOML configuration reference (including the
-multi-mount layout). For Azure-specific keys (account-name, sas,
-managed-identity, default-azure-credential, connection-string) see
+multi-mount layout). For AWS credential resolution see
 [Authentication and credentials](./credentials.md).
 
 ---
@@ -123,7 +122,6 @@ take their inputs from CLI arguments and interactive prompts.
 
 ```toml
 # ./osvfs.toml or %APPDATA%\OSVFS\config.toml
-provider             = "s3"
 bucket               = "my-bucket"
 root-folder          = "C:/Users/you/OSVFS"
 endpoint-url         = "http://localhost:4566"   # optional

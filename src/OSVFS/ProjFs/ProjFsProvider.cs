@@ -4,6 +4,7 @@ using Microsoft.Windows.ProjFS;
 using OSVFS.Configuration;
 using OSVFS.Diagnostics;
 using OSVFS.ObjectStore;
+using OSVFS.ObjectStore.S3;
 using OSVFS.Sync;
 using OSVFS.Sync.ProjFs;
 using OSVFS.Sync.Sqs;
@@ -26,7 +27,7 @@ internal sealed class ProjFsProvider : IRequiredCallbacks, IDisposable
     private readonly ILoggerFactory loggerFactory;
     private readonly string syncRootPath;
     private readonly VirtualizationInstance virtualizationInstance;
-    private readonly IObjectStoreBackend backend;
+    private readonly S3Backend backend;
     private readonly ConcurrentDictionary<Guid, DirectoryEnumerationSession> activeEnumerations = new();
     private readonly NotificationCallbacks notificationCallbacks;
     private readonly ObjectStoreChangeWatcher? changeWatcher;
@@ -59,21 +60,7 @@ internal sealed class ProjFsProvider : IRequiredCallbacks, IDisposable
         this.logger = logger;
         this.loggerFactory = loggerFactory;
         syncRootPath = options.VirtRoot;
-        backend = ObjectStoreBackendFactory.Create(
-            options.Provider,
-            options.Bucket,
-            options.EndpointUrl,
-            options.KeyPrefix,
-            options.Region,
-            options.Credentials,
-            options.BandwidthLimits,
-            options.MultipartThresholdBytes,
-            options.MultipartPartSizeBytes,
-            options.RetryMaxAttempts,
-            options.MaxConcurrentUploads,
-            options.MaxConcurrentDownloads,
-            options.MaxMultipartParts,
-            options.RefreshNotifier);
+        backend = options.CreateBackend();
 
         EnsureVirtualizationRoot();
 
@@ -645,15 +632,14 @@ internal sealed class ProjFsProvider : IRequiredCallbacks, IDisposable
                     throw new InvalidOperationException(
                         "--change-source 'events' requires an event queue / subscription (--event-queue).");
                 }
-                return ChangeNotificationFactory.Create(
-                    Options.Provider,
+                return SqsChangeSourceFactory.Create(
                     Options.EventQueue!,
                     Options.Bucket,
                     Options.KeyPrefix,
                     Options.EndpointUrl,
                     Options.Region,
                     Options.Credentials,
-                    loggerFactory);
+                    loggerFactory.CreateLogger<SqsChangeSource>());
 
             default:
                 throw new InvalidOperationException(

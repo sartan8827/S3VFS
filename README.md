@@ -12,9 +12,8 @@ alternative to `rclone mount`** on Windows: ProjFS ships as an optional
 feature in Windows 10 1809+ and Windows 11, so OSVFS does not need WinFsp
 (or any other third-party kernel driver) to be installed.
 
-OSVFS ships with **Amazon S3 and Azure Blob Storage** backends today;
-**Google Cloud Storage** is planned behind the same `provider` flag —
-see [Supported backends](#supported-backends) below.
+OSVFS supports **Amazon S3** only — see
+[Supported backends](#supported-backends) below.
 
 [projfs]: https://learn.microsoft.com/en-us/windows/win32/projfs/projected-file-system
 
@@ -43,7 +42,7 @@ zero-third-party-driver install path.
 | Install footprint | Single signed `osvfs.exe` (Native AOT) | `rclone.exe` + WinFsp MSI |
 | AppLocker / WDAC fit | No third-party kernel driver to allow-list | Requires WinFsp kernel driver to be allowed by policy |
 | Explorer integration | Native ProjFS placeholders — the same "online-only" model OneDrive uses | FUSE-style mount; files appear as fully-present |
-| Backends today | S3 + Azure Blob (GCS planned behind the same `provider` flag) | 70+ backends |
+| Backends | Amazon S3 only | 70+ backends |
 | Runtime dependency | None (Native AOT) | None (single Go binary) |
 
 If you need a backend OSVFS does not support, keep using rclone. If you
@@ -52,17 +51,11 @@ kernel driver, OSVFS is for you.
 
 ## Supported backends
 
-OSVFS is built around a provider-neutral
-[`IObjectStoreBackend`](src/OSVFS.Core/ObjectStore/IObjectStoreBackend.cs)
-abstraction, and the backend is selected at startup with the `provider`
-flag. Multi-cloud support is an explicit goal of the project, not just an
-abstraction left open for later.
-
-| Provider | `provider` value | Status |
-| --- | --- | --- |
-| Amazon S3 (and S3-compatible: MinIO, Cloudflare R2, Wasabi, Backblaze B2, Ceph, …) | `s3` | **Available** |
-| Azure Blob Storage | `azureblob` | **Available** |
-| Google Cloud Storage | `gcs` | Planned |
+OSVFS targets **Amazon S3** only. The S3 implementation lives in
+[`S3Backend`](src/OSVFS.Core/ObjectStore/S3/S3Backend.cs), and push-mode
+change notifications use S3 → EventBridge → SQS. The `endpoint-url` key
+exists mainly so the integration tests can run against LocalStack; other
+S3-compatible services are not a supported target.
 
 ## Documentation
 
@@ -77,13 +70,12 @@ The detailed reference is split into focused pages under
   and retry policy.
 - **[Synchronization and change events](docs/sync-and-events.md)** —
   polling vs. push-mode change detection, on-demand sync, read-only
-  mounts, and SQS / Event Grid setup.
+  mounts, and SQS setup.
 - **[Observability](docs/observability.md)** — structured logging,
   OpenTelemetry traces / metrics, the local Prometheus listener, and
   user-metadata round-trip.
-- **[Authentication and credentials](docs/credentials.md)** — AWS
-  shared profile / SSO / `aws login` and the four Azure auth branches
-  (connection string, SAS, Managed Identity, DefaultAzureCredential).
+- **[Authentication and credentials](docs/credentials.md)** — the OSVFS
+  credential store and AWS shared profile / SSO / `aws login`.
 - **[Troubleshooting](docs/troubleshooting.md)** — the `osvfs doctor`
   self-check and the `osvfs lost-and-found` recovery CLI.
 
@@ -109,8 +101,7 @@ osvfs mount --name personal      # start one mount by name
 ```
 
 Open the configured root folder in Explorer and the bucket contents
-appear. For Azure Blob (`provider = "azureblob"`) see
-[Authentication and credentials → Azure Blob configuration](docs/credentials.md#azure-blob-configuration).
+appear.
 
 ## Architecture
 
@@ -153,7 +144,7 @@ Roughly:
   receives ProjFS notifications for local writes / deletes / renames and
   forwards them to the object-store backend.
 - [`S3Backend`](src/OSVFS.Core/ObjectStore/S3/S3Backend.cs) wraps AWSSDK.S3
-  behind the provider-neutral [`IObjectStoreBackend`](src/OSVFS.Core/ObjectStore/IObjectStoreBackend.cs)
+  behind the [`IObjectStoreBackend`](src/OSVFS.Core/ObjectStore/IObjectStoreBackend.cs)
   with the small, ProjFS-shaped surface the provider needs (list, head,
   range read, upload, delete, rename-by-copy). Uploads at or above the
   configured `multipart-threshold` (default 16 MiB) are routed through
@@ -213,26 +204,14 @@ The output is a self-contained `osvfs.exe`. End users do **not** need the
 # Unit tests (Windows or Linux)
 dotnet test tests\OSVFS.Core.UnitTests
 
-# Integration tests against LocalStack + Azurite (requires Docker)
+# Integration tests against LocalStack (requires Docker)
 dotnet test tests\OSVFS.Core.IntegrationTests
 ```
 
 The integration test project targets `net10.0` and only references the
 cross-platform `OSVFS.Core` library, so it can run on Linux CI runners
-against [LocalStack](https://github.com/localstack/localstack) and
-[Azurite](https://learn.microsoft.com/en-us/azure/storage/common/storage-use-azurite)
-via [Testcontainers](https://dotnet.testcontainers.org/).
-
-> **Azurite ServiceVersion pin.** The Azure SDK ships its newest default
-> `x-ms-version` with each release, but Azurite trails the live service by
-> several months. To let Dependabot keep `Azure.Storage.Blobs` /
-> `Azure.Storage.Queues` current without breaking the IT, the integration
-> tests pin `BlobClientOptions.ServiceVersion` /
-> `QueueClientOptions.ServiceVersion` to whatever the Azurite "latest" image
-> still understands. Production code path leaves the options as null so the
-> SDK's newest default is used. When Azurite ships support for a higher API
-> version, bump the constants in
-> [`tests/OSVFS.Core.IntegrationTests/AzuriteFixture.cs`](tests/OSVFS.Core.IntegrationTests/AzuriteFixture.cs).
+against [LocalStack](https://github.com/localstack/localstack) via
+[Testcontainers](https://dotnet.testcontainers.org/).
 
 ## Why C# / .NET?
 

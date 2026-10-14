@@ -77,20 +77,4 @@ public class UserMetadataTests
         Assert.Throws<UserMetadataTooLargeException>(
             () => UserMetadata.EnsureWithinSizeLimit(payload, S3MaxBytes));
     }
-
-    [Fact]
-    public void EnsureWithinSizeLimit_uses_caller_supplied_limit_for_higher_quota_providers()
-    {
-        // Azure Blob and GCS allow 8 KiB; the same payload that breaches the
-        // 2 KiB S3 ceiling must validate cleanly when an 8 KiB ceiling is supplied.
-        const int AzureLikeLimit = 8 * 1024;
-        var payload = new Dictionary<string, string>
-        {
-            [new string('k', 1024)] = new string('v', 3072),
-        };
-
-        UserMetadata.EnsureWithinSizeLimit(payload, AzureLikeLimit);
-        Assert.Throws<UserMetadataTooLargeException>(
-            () => UserMetadata.EnsureWithinSizeLimit(payload, S3MaxBytes));
-    }
 }

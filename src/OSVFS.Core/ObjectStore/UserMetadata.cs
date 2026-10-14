@@ -3,11 +3,10 @@ using System.Text;
 namespace OSVFS.ObjectStore;
 
 /// <summary>
-/// Helpers for the user-defined metadata that providers expose as
-/// <c>x-amz-meta-*</c> (S3) / custom blob metadata (Azure) / object metadata (GCS).
-/// Centralizes the lowercase-key normalization shared across providers; the
-/// per-object byte ceiling is provider-specific and supplied through
-/// <see cref="IObjectStoreBackend.UserMetadataMaxBytes"/> at validation time.
+/// Helpers for the user-defined metadata that S3 exposes as <c>x-amz-meta-*</c>.
+/// Centralizes the lowercase-key normalization; the per-object byte ceiling is
+/// supplied through <see cref="IObjectStoreBackend.UserMetadataMaxBytes"/> at
+/// validation time.
 /// </summary>
 internal static class UserMetadata
 {
@@ -22,8 +21,7 @@ internal static class UserMetadata
     /// Produces a lowercased-key, ordinal-comparing copy of <paramref name="metadata"/>,
     /// or <see cref="Empty"/> when the input is null/empty. AWS normalizes user
     /// metadata names to lowercase on the wire, so storing the same shape locally
-    /// keeps round-trips bit-identical. Azure Blob accepts mixed-case names but
-    /// is case-insensitive on retrieval, so the lowercase shape is also safe there.
+    /// keeps round-trips bit-identical.
     /// </summary>
     public static IReadOnlyDictionary<string, string> Normalize(
         IReadOnlyDictionary<string, string>? metadata)
@@ -66,8 +64,7 @@ internal static class UserMetadata
 
 /// <summary>
 /// Thrown when a caller asks the backend to attach more user metadata than the
-/// provider's per-object limit allows. The limit is provider-specific (S3:
-/// 2 KiB, Azure Blob / GCS: 8 KiB) and is carried on
+/// per-object limit allows (S3: 2 KiB). The limit is carried on
 /// <see cref="LimitBytes"/>.
 /// </summary>
 internal sealed class UserMetadataTooLargeException(int actualBytes, int limitBytes)

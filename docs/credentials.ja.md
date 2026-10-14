@@ -2,63 +2,11 @@
 
 [← README に戻る](../README.ja.md) · [English](./credentials.md)
 
-OSVFS が AWS / Azure のクレデンシャルをどう解決するか。OSVFS の
-DPAPI 暗号化クレデンシャルストア、AWS IAM Identity Center (SSO)、
-AWS CLI 2.32+ の `aws login`、Azure の 4 認証ブランチ (connection
-string / SAS / Managed Identity / DefaultAzureCredential) を扱います。
+OSVFS が AWS のクレデンシャルをどう解決するか。OSVFS の DPAPI 暗号化
+クレデンシャルストア、AWS IAM Identity Center (SSO)、AWS CLI 2.32+ の
+`aws login` を扱います。
 
 ---
-
-## Azure Blob の設定
-
-`provider = "azureblob"` を選ぶと Azure バックエンドに切り替わります。
-README の他のセクション (帯域幅の制限、マルチパートのチューニング、変更
-ソースの選択、doctor、lost-and-found …) はそのまま適用されます。マウント
-設定の差分は最小限です。
-
-```toml
-# ./osvfs.toml — Azure Blob、connection-string 認証
-provider          = "azureblob"
-bucket            = "my-container"             # Azure コンテナ名
-root-folder       = "C:/Users/you/OSVFS-azure"
-connection-string = "DefaultEndpointsProtocol=https;AccountName=…;AccountKey=…;EndpointSuffix=core.windows.net"
-```
-
-Azure Blob はマウントごとに以下 4 つの認証ブランチのうち**ちょうど 1 つ**
-を受け付けます。複数指定はあいまいさを避けるため起動時に拒否されます。
-
-| TOML キー | Azure SDK の経路 | 備考 |
-| --- | --- | --- |
-| `connection-string` | shared key 内蔵 | Azurite が出力する形式、Portal の "アクセスキー" ブレードからコピーできる形式 |
-| `account-name` + `sas` | `AzureSasCredential` | サービス / アカウントレベル SAS |
-| `account-name` + `managed-identity = true` | `ManagedIdentityCredential` | Azure 上で動くワークロード用 (VM / App Service / Functions / AKS) |
-| `account-name` + `default-azure-credential = true` | `DefaultAzureCredential` チェーン | env / Visual Studio サインイン / Azure CLI / Managed Identity 等を SDK 公式の順で評価 |
-
-`endpoint-url` はソブリンクラウドや Azure Stack 用で、デフォルトの
-`*.blob.core.windows.net` を `https://{account}.blob.{suffix}` で上書き
-できます。
-
-#### ストレージアカウントの安全性要件
-
-OSVFS はストレージアカウントで **Blob Soft Delete** が有効でない限り起動を
-拒否します。安全性ガードはコピペ可能な
-`az storage account blob-service-properties update` コマンドを表示します。
-**Versioning** は上書きパスの保護として併用が推奨され、ガードのメッセージ
-にも両方の有効化フラグを含めています。Versioning の状態は OSVFS が使う
-データプレーン SDK では取得できないため自動検証はしませんが、ガードの
-出力する `az` コマンドを実行すれば両方が同時に有効になります。
-
-#### サーバーサイド変更通知 (Event Grid → Storage Queue)
-
-`change-source = "events"` で Watcher を Azure Storage Queue に接続できま
-す。Storage Account に Event Grid サブスクリプションを設定し、
-`Microsoft.Storage.BlobCreated` / `Microsoft.Storage.BlobDeleted` を
-Storage Queue に送るようにします。`event-queue` には connection-string 利
-用時はキュー名を、SAS / Managed Identity / DefaultAzureCredential 利用時は
-完全なキュー URL を指定します。サブスクリプションの構築 (Storage Account
-→ トピック → サブスクリプション → Storage Queue) は Azure ポータルまたは
-`az eventgrid event-subscription create` で行います。
-
 
 ## AWS 認証情報の管理
 
@@ -93,7 +41,6 @@ osvfs credentials remove --profile prod
 その上でマウント設定にプロファイル名を記述します:
 
 ```toml
-provider    = "s3"
 bucket      = "my-bucket"
 root-folder = "C:/Users/you/OSVFS"
 aws-profile = "prod"
@@ -144,7 +91,6 @@ AWS IAM Identity Center (旧 AWS SSO) を利用する環境では、AWS CLI 標�
    SDK 共有プロファイルチェーンへフォールバックして SSO エントリを
    拾います:
    ```toml
-   provider    = "s3"
    bucket      = "my-bucket"
    root-folder = "C:/Users/you/OSVFS"
    aws-profile = "prod"
@@ -207,7 +153,6 @@ IAM Identity Center を使わない環境では、AWS CLI v2.32.0 で追加さ�
    OSVFS は SDK 共有プロファイルチェーンにフォールバックして
    `credential_process` エントリを拾います:
    ```toml
-   provider    = "s3"
    bucket      = "my-bucket"
    root-folder = "C:/Users/you/OSVFS"
    aws-profile = "osvfs-login"

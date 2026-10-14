@@ -1,6 +1,7 @@
 using OSVFS.Configuration;
 using OSVFS.Net;
 using OSVFS.ObjectStore;
+using OSVFS.ObjectStore.S3;
 
 namespace OSVFS;
 
@@ -13,12 +14,7 @@ namespace OSVFS;
 internal sealed record ProjFsProviderOptions
 {
     /// <summary>
-    /// Object-store provider backing the virtualization root.
-    /// </summary>
-    public ObjectStoreProvider Provider { get; init; } = ObjectStoreProvider.S3;
-
-    /// <summary>
-    /// Name of the bucket/container projected into the virtualization root.
+    /// Name of the S3 bucket projected into the virtualization root.
     /// </summary>
     public required string Bucket { get; init; }
 
@@ -79,15 +75,10 @@ internal sealed record ProjFsProviderOptions
     public string? EventQueue { get; init; }
 
     /// <summary>
-    /// Optional credential source carried from the mount config to the
-    /// active backend. Provider-specific (<see cref="AwsCredentialSource"/>
-    /// for S3 today; <c>GcsCredentialSource</c> / <c>AzureCredentialSource</c>
-    /// once those backends land), but the host treats it as the opaque
-    /// <see cref="IObjectStoreCredentialSource"/> seam so it can stay
-    /// provider-agnostic at compile time. Null falls back to whatever default
-    /// chain the active backend uses (e.g. the AWS SDK's chain for S3).
+    /// Optional AWS credential source resolved from the mount config. Null
+    /// falls back to the AWS SDK's default credential chain.
     /// </summary>
-    public IObjectStoreCredentialSource? Credentials { get; init; }
+    public AwsCredentialSource? Credentials { get; init; }
 
     /// <summary>
     /// Optional per-direction bandwidth ceilings. Each component null means
@@ -150,4 +141,31 @@ internal sealed record ProjFsProviderOptions
     /// logged at the SDK level.
     /// </summary>
     public ICredentialRefreshNotifier? RefreshNotifier { get; init; }
+
+    /// <summary>
+    /// Builds an <see cref="S3Backend"/> bound to these options. The backend
+    /// owns the bandwidth limiters created here and disposes them with itself.
+    /// </summary>
+    public S3Backend CreateBackend() => new(
+        Bucket,
+        EndpointUrl,
+        KeyPrefix,
+        Region,
+        Credentials,
+        CreateLimiter(BandwidthLimits.UpBytesPerSecond),
+        CreateLimiter(BandwidthLimits.DownBytesPerSecond),
+        MultipartThresholdBytes,
+        MultipartPartSizeBytes,
+        RetryMaxAttempts,
+        MaxConcurrentUploads,
+        MaxConcurrentDownloads,
+        MaxMultipartParts,
+        RefreshNotifier);
+
+    /// <summary>
+    /// Builds a token-bucket limiter when <paramref name="bytesPerSecond"/> is
+    /// positive; null otherwise.
+    /// </summary>
+    private static TokenBucketRateLimiter? CreateLimiter(long? bytesPerSecond) =>
+        bytesPerSecond is > 0 ? new TokenBucketRateLimiter(bytesPerSecond.Value) : null;
 }

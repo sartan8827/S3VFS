@@ -2,8 +2,7 @@ namespace OSVFS.ObjectStore;
 
 /// <summary>
 /// Snapshot of an object (or synthesized common-prefix directory) as it appears to the
-/// virtualization layer. Provider-neutral so a future GCS or Azure Blob backend can
-/// surface its own metadata through the same shape.
+/// virtualization layer.
 /// </summary>
 /// <param name="Key">Virt-root-relative object key (linked prefix already stripped, forward-slash separated).</param>
 /// <param name="RelativePath">Same key in Windows path form (backslash-separated).</param>
