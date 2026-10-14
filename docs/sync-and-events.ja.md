@@ -2,7 +2,7 @@
 
 [← README に戻る](../README.ja.md) · [English](./sync-and-events.md)
 
-OSVFS のリモート変更検出 (ポーリング / イベント駆動)、整合性チェックの
+S3VFS のリモート変更検出 (ポーリング / イベント駆動)、整合性チェックの
 間隔、読み取り専用マウントへの切替方法。push 型の通知には
 S3 → EventBridge → SQS を使います。
 
@@ -10,7 +10,7 @@ S3 → EventBridge → SQS を使います。
 
 ## 変更検出モード
 
-OSVFS は、他クライアント (AWS マネジメントコンソール、別マシンの
+S3VFS は、他クライアント (AWS マネジメントコンソール、別マシンの
 `aws s3 cp`、チームメンバーの作業など) がバケットに加えた変更を検出する
 方式を 2 つから選べます。バケット規模、要求するレイテンシ、サーバ側の
 設定権限に応じて選択してください。
@@ -34,7 +34,7 @@ AWS CLI コマンドを示していますが、SQS / EventBridge / S3 のマネ�
 1. **SQS キューを作成。**
 
    ```bash
-   aws sqs create-queue --queue-name osvfs-changes \
+   aws sqs create-queue --queue-name s3vfs-changes \
      --attributes ReceiveMessageWaitTimeSeconds=20
    ```
 
@@ -50,7 +50,7 @@ AWS CLI コマンドを示していますが、SQS / EventBridge / S3 のマネ�
        "Effect": "Allow",
        "Principal": { "Service": "events.amazonaws.com" },
        "Action": "sqs:SendMessage",
-       "Resource": "arn:aws:sqs:REGION:ACCOUNT_ID:osvfs-changes"
+       "Resource": "arn:aws:sqs:REGION:ACCOUNT_ID:s3vfs-changes"
      }]
    }
    ```
@@ -87,15 +87,15 @@ AWS CLI コマンドを示していますが、SQS / EventBridge / S3 のマネ�
 
    ```bash
    aws events put-rule \
-     --name osvfs-bucket-changes \
+     --name s3vfs-bucket-changes \
      --event-pattern file://event-pattern.json
 
    aws events put-targets \
-     --rule osvfs-bucket-changes \
-     --targets 'Id=osvfs-sqs,Arn=arn:aws:sqs:REGION:ACCOUNT_ID:osvfs-changes'
+     --rule s3vfs-bucket-changes \
+     --targets 'Id=s3vfs-sqs,Arn=arn:aws:sqs:REGION:ACCOUNT_ID:s3vfs-changes'
    ```
 
-OSVFS が動作する IAM 主体には、対象キューに対して
+S3VFS が動作する IAM 主体には、対象キューに対して
 `sqs:ReceiveMessage`、`sqs:DeleteMessage`、(`event-queue` にキュー名のみを
 渡す場合は) `sqs:GetQueueUrl` が必要です。
 
@@ -103,12 +103,12 @@ OSVFS が動作する IAM 主体には、対象キューに対して
 
 ```toml
 bucket        = "my-bucket"
-root-folder   = "C:/Users/you/OSVFS"
+root-folder   = "C:/Users/you/S3VFS"
 change-source = "events"
-event-queue   = "https://sqs.ap-northeast-1.amazonaws.com/123456789012/osvfs-changes"
+event-queue   = "https://sqs.ap-northeast-1.amazonaws.com/123456789012/s3vfs-changes"
 ```
 
-> 仮想化ルート 1 つにつき 1 キュー。同じキューを複数の `osvfs` インスタンス
+> 仮想化ルート 1 つにつき 1 キュー。同じキューを複数の `s3vfs` インスタンス
 > で共有すると、メッセージが消費者間で分配されてしまい、それぞれが半分しか
 > 受け取らなくなります。
 
@@ -124,7 +124,7 @@ event-queue   = "https://sqs.ap-northeast-1.amazonaws.com/123456789012/osvfs-cha
 
 ## 大規模バケット運用時の同期間隔
 
-`osvfs` は外部オブジェクトストアの変更を `sync-interval-seconds`
+`s3vfs` は外部オブジェクトストアの変更を `sync-interval-seconds`
 (既定 `30` 秒) ごとのバケット再列挙で検出します。`sync-mode = "full"` では
 各ポーリングが `ListObjectsV2` の全ページ (設定された prefix 以下) を
 走査します。`sync-mode = "on-demand"` (既定) では訪問済みディレクトリごとに
@@ -147,12 +147,12 @@ S3 に対して 1 ページの ListObjectsV2 は十数〜数百ミリ秒程度�
 ## 読み取り専用マウント
 
 仮想化ルートを「バケットからは読み込むが書き戻しはしない」一方向モード
-に切り替えたい場合は、[`osvfs.toml`](#設定ファイル) で `read-only = true`
+に切り替えたい場合は、[`s3vfs.toml`](#設定ファイル) で `read-only = true`
 を指定します:
 
 ```toml
 bucket      = "my-bucket"
-root-folder = "C:/Users/you/OSVFS"
+root-folder = "C:/Users/you/S3VFS"
 read-only   = true
 ```
 
@@ -165,7 +165,7 @@ read-only   = true
   作成 / 上書き / ハンドルクローズ時の修正通知自体は受信しますが、その後の
   アップロード経路は短絡されます。
 - オブジェクトストア変更ウォッチャーは無効化されます。`ListObjectsV2`
-  のポーリングも SQS の receive も走らず、`.osvfs-lost+found` 隔離
+  のポーリングも SQS の receive も走らず、`.s3vfs-lost+found` 隔離
   ディレクトリも作成されません。したがって読み取り専用マウントは
   各ディレクトリを初めて列挙した時点の **凍結スナップショット** に
   なり、マウント中に他クライアントが行ったリモート編集は反映されません。

@@ -2,7 +2,7 @@
 
 [← Back to README](../README.md) · [日本語版](./configuration.ja.md)
 
-This page covers OSVFS prerequisites, how to start a mount, the small CLI
+This page covers S3VFS prerequisites, how to start a mount, the small CLI
 surface, and the full TOML configuration reference (including the
 multi-mount layout). For AWS credential resolution see
 [Authentication and credentials](./credentials.md).
@@ -14,11 +14,11 @@ multi-mount layout). For AWS credential resolution see
 - Windows 10 1809 (build 17763) or later, or Windows 11
 - The Windows optional feature **`Client-ProjFS`** must be enabled
 - AWS credentials reachable via the standard AWS SDK chain (environment
-  variables, shared profile, IAM role, etc.) — or saved into the OSVFS
+  variables, shared profile, IAM role, etc.) — or saved into the S3VFS
   built-in encrypted store described in
   [Managing AWS credentials](#managing-aws-credentials)
 - An S3 bucket you have read/write access to
-- **Bucket versioning must be Enabled** on the target bucket. `osvfs`
+- **Bucket versioning must be Enabled** on the target bucket. `s3vfs`
   refuses to start otherwise — see [Why versioning matters](#why-versioning-matters)
   for the rationale and the `allow-unversioned` escape hatch. The
   credentials must also allow `s3:GetBucketVersioning`.
@@ -40,14 +40,14 @@ gone, an overwrite leaves no prior copy. Versioning turns each of those
 calls into a new version + delete-marker pair, so a misclick in Explorer or
 a runaway script remains recoverable.
 
-If `osvfs` detects that the configured bucket has versioning disabled (or
+If `s3vfs` detects that the configured bucket has versioning disabled (or
 suspended) it refuses to start with a copy-pasteable `aws s3api
 put-bucket-versioning` command, the bucket name, and a link back to this
 section.
 
 For CI runs or disposable buckets where the bucket is recreated per-job
 and the recoverability story does not apply, set `allow-unversioned = true`
-in `osvfs.toml` to bypass the safety check.
+in `s3vfs.toml` to bypass the safety check.
 
 Enable ProjFS once, in an elevated PowerShell session:
 
@@ -57,38 +57,38 @@ Enable-WindowsOptionalFeature -Online -FeatureName Client-ProjFS -All
 
 ## Run
 
-OSVFS reads every per-mount setting from a TOML configuration file (see
+S3VFS reads every per-mount setting from a TOML configuration file (see
 [Configuration file](#configuration-file) for the full key reference and the
 multi-mount layout). The shortest possible config is:
 
 ```toml
-# ./osvfs.toml
+# ./s3vfs.toml
 bucket      = "my-bucket"
-root-folder = "C:/Users/you/OSVFS"
+root-folder = "C:/Users/you/S3VFS"
 ```
 
 With that file in the current directory (or at
-`%APPDATA%\OSVFS\config.toml`):
+`%APPDATA%\S3VFS\config.toml`):
 
 ```powershell
-osvfs                            # start the configured mount
-osvfs mount-all                  # start every [[mount]] in the config (multi-mount form)
-osvfs mount --name personal      # start one mount by name
+s3vfs                            # start the configured mount
+s3vfs mount-all                  # start every [[mount]] in the config (multi-mount form)
+s3vfs mount --name personal      # start one mount by name
 ```
 
 Open the configured root folder in Explorer and the bucket contents appear.
 
 ## Command-line surface
 
-OSVFS is intentionally configuration-driven: every per-mount setting
+S3VFS is intentionally configuration-driven: every per-mount setting
 (`bucket`, `root-folder`, `region`, `aws-profile`, `bandwidth-up`,
-`retry-max-attempts`, …) lives only in `osvfs.toml`. The command line
+`retry-max-attempts`, …) lives only in `s3vfs.toml`. The command line
 exposes just three things:
 
 | Surface | Purpose |
 | --- | --- |
 | Sub-commands (`mount`, `mount-all`, `credentials`, `doctor`, `lost-and-found`) | Pick which mount(s) to start, manage the encrypted credential store, run the environment self-check, or recover quarantined files. |
-| `--name <mount>` | Selects an entry from the `[[mount]]` array on `osvfs mount`. |
+| `--name <mount>` | Selects an entry from the `[[mount]]` array on `s3vfs mount`. |
 | `--verbose`, `--log-format` | Process-level overrides for one-off debugging. The TOML keys (`verbose`, `log-format`) are still honoured; the CLI flags simply win when both are present. |
 
 To project only a sub-tree of a bucket — for example
@@ -104,10 +104,10 @@ Mount settings live exclusively in a TOML configuration file. Up to three
 sources are merged in **increasing-priority order** — later sources override
 earlier ones on a per-key basis:
 
-1. **`osvfs.toml` next to `osvfs.exe`** (lowest priority — acts as the
+1. **`s3vfs.toml` next to `s3vfs.exe`** (lowest priority — acts as the
    packaged baseline). Resolved via `AppContext.BaseDirectory`, so the lookup
    is independent of the current working directory.
-2. **`%APPDATA%\OSVFS\config.toml`** (per-user, machine-global). Operators
+2. **`%APPDATA%\S3VFS\config.toml`** (per-user, machine-global). Operators
    typically keep credentials / log preferences here.
 3. **`--config <path>`** (highest priority). Useful when an operator wants to
    pick between several profile files without editing the standard locations.
@@ -121,9 +121,9 @@ config file values when supplied.
 take their inputs from CLI arguments and interactive prompts.
 
 ```toml
-# ./osvfs.toml or %APPDATA%\OSVFS\config.toml
+# ./s3vfs.toml or %APPDATA%\S3VFS\config.toml
 bucket               = "my-bucket"
-root-folder          = "C:/Users/you/OSVFS"
+root-folder          = "C:/Users/you/S3VFS"
 endpoint-url         = "http://localhost:4566"   # optional
 region               = "ap-northeast-1"          # optional
 prefix               = "team-a/"                 # optional
@@ -146,9 +146,9 @@ event-queue          = ""                        # SQS URL/name, required for ev
 ```
 
 A ready-to-edit sample is shipped as
-[`osvfs.toml.example`](./osvfs.toml.example) at the repo root and is also
-copied next to `osvfs.exe` on `dotnet publish`, so you can rename it to
-`osvfs.toml` (or `%APPDATA%\OSVFS\config.toml`) and uncomment the keys you
+[`s3vfs.toml.example`](./s3vfs.toml.example) at the repo root and is also
+copied next to `s3vfs.exe` on `dotnet publish`, so you can rename it to
+`s3vfs.toml` (or `%APPDATA%\S3VFS\config.toml`) and uncomment the keys you
 need.
 
 Both kebab-case (`root-folder`) and snake_case (`root_folder`) keys are
@@ -156,7 +156,7 @@ accepted; kebab is preferred. With a config file in place, a typical mount
 is just:
 
 ```powershell
-osvfs                       # all options sourced from osvfs.toml
+s3vfs                       # all options sourced from s3vfs.toml
 ```
 
 #### Multiple mounts in a single config
@@ -167,19 +167,19 @@ The process-level keys (`verbose`, `log-format`) stay at the top level and
 apply to every mount:
 
 ```toml
-# ./osvfs.toml — multiple mounts
+# ./s3vfs.toml — multiple mounts
 verbose   = false
 log-format = "json"
 
 [[mount]]
 name        = "personal"
 bucket      = "my-personal"
-root-folder = "C:/Users/you/OSVFS-personal"
+root-folder = "C:/Users/you/S3VFS-personal"
 
 [[mount]]
 name        = "work"
 bucket      = "my-work"
-root-folder = "C:/Users/you/OSVFS-work"
+root-folder = "C:/Users/you/S3VFS-work"
 prefix      = "team-a/"
 aws-profile = "prod-readonly"
 ```
@@ -195,13 +195,13 @@ When a file declares 2+ mounts, the bare root command refuses to guess
 which one the operator wants. Pick one of:
 
 ```powershell
-osvfs mount-all                 # start every [[mount]] in this process
-osvfs mount --name personal     # start a single named mount
-osvfs mount --name work         # start a different mount from the same config
+s3vfs mount-all                 # start every [[mount]] in this process
+s3vfs mount --name personal     # start a single named mount
+s3vfs mount --name work         # start a different mount from the same config
 ```
 
 Each mount runs its own `ProjFsProvider`; logs from a given mount land in
-the `OSVFS.Mount.<name>` category so text / JSON formatters surface which
+the `S3VFS.Mount.<name>` category so text / JSON formatters surface which
 mount each line came from. Pressing Enter on the host process disposes
 every mount in reverse start order.
 

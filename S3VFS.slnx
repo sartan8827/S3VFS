@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/Solution Items/">
+    <File Path="README.md" />
+  </Folder>
+  <Project Path="src/S3VFS.Core/S3VFS.Core.csproj" />
+  <Project Path="src/S3VFS/S3VFS.csproj" />
+  <Project Path="tests/S3VFS.Core.UnitTests/S3VFS.Core.UnitTests.csproj" />
+  <Project Path="tests/S3VFS.Core.IntegrationTests/S3VFS.Core.IntegrationTests.csproj" />
+  <Project Path="tests/S3VFS.UnitTests/S3VFS.UnitTests.csproj" />
+</Solution>

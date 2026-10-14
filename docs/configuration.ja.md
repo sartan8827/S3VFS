@@ -2,7 +2,7 @@
 
 [← README に戻る](../README.ja.md) · [English](./configuration.md)
 
-OSVFS の必要環境、マウントの起動方法、CLI の最小表面、TOML 設定ファイルの
+S3VFS の必要環境、マウントの起動方法、CLI の最小表面、TOML 設定ファイルの
 全キーリファレンス (マルチマウント含む) をまとめます。AWS 認証情報の
 解決方法は [認証とクレデンシャル](./credentials.ja.md) を参照してください。
 
@@ -14,11 +14,11 @@ OSVFS の必要環境、マウントの起動方法、CLI の最小表面、TOML
 - Windows オプション機能 **`Client-ProjFS`** が有効化されていること
 - AWS SDK の標準的な認証情報チェーン (環境変数 / 共有プロファイル / IAM ロール
   など) で解決できる AWS 認証情報、または下記
-  [AWS 認証情報の管理](#aws-認証情報の管理)で説明する OSVFS 内蔵の暗号化スト
+  [AWS 認証情報の管理](#aws-認証情報の管理)で説明する S3VFS 内蔵の暗号化スト
   アに保存した認証情報
 - 読み書き可能な S3 バケット
 - 対象バケットで **バージョニングが有効化されていること**。バージョニングが
-  Enabled でない場合 `osvfs` は起動を拒否します — 詳しい理由と
+  Enabled でない場合 `s3vfs` は起動を拒否します — 詳しい理由と
   `allow-unversioned` によるバイパス方法は
   [バージョニングが必要な理由](#バージョニングが必要な理由) を参照してくだ
   さい。認証情報は併せて `s3:GetBucketVersioning` を許可している必要があり
@@ -42,13 +42,13 @@ aws s3api put-bucket-versioning `
 して保存されるため、エクスプローラー上の誤操作や暴走スクリプトからも復旧
 できます。
 
-`osvfs` は起動時に対象バケットがバージョニング無効 (もしくは Suspended) の
+`s3vfs` は起動時に対象バケットがバージョニング無効 (もしくは Suspended) の
 状態であると判定すると、コピー&ペースト可能な
 `aws s3api put-bucket-versioning` コマンド・バケット名・このセクションへの
 リンクを含むエラーメッセージを出して起動を拒否します。
 
 バケットをジョブ毎に再作成する CI 用途や使い捨てバケットなど、復旧性の議論
-が当てはまらないシナリオでは `osvfs.toml` で `allow-unversioned = true`
+が当てはまらないシナリオでは `s3vfs.toml` で `allow-unversioned = true`
 を設定すると安全チェックをバイパスできます。
 
 ProjFS は管理者権限の PowerShell で 1 回だけ有効化します:
@@ -59,38 +59,38 @@ Enable-WindowsOptionalFeature -Online -FeatureName Client-ProjFS -All
 
 ## 起動
 
-OSVFS はマウントごとの設定を **TOML 設定ファイル** から読み込みます (キー
+S3VFS はマウントごとの設定を **TOML 設定ファイル** から読み込みます (キー
 の詳細と複数マウント形式は [設定ファイル](#設定ファイル) 参照)。最小構成
 は次の 2 行です:
 
 ```toml
-# ./osvfs.toml
+# ./s3vfs.toml
 bucket      = "my-bucket"
-root-folder = "C:/Users/you/OSVFS"
+root-folder = "C:/Users/you/S3VFS"
 ```
 
-このファイルをカレントディレクトリ (もしくは `%APPDATA%\OSVFS\config.toml`)
+このファイルをカレントディレクトリ (もしくは `%APPDATA%\S3VFS\config.toml`)
 に置けば:
 
 ```powershell
-osvfs                            # 設定済みマウントを起動
-osvfs mount-all                  # [[mount]] 配列の全マウントをこのプロセスで起動
-osvfs mount --name personal      # 名前指定で 1 つだけ起動
+s3vfs                            # 設定済みマウントを起動
+s3vfs mount-all                  # [[mount]] 配列の全マウントをこのプロセスで起動
+s3vfs mount --name personal      # 名前指定で 1 つだけ起動
 ```
 
 仮想化ルートのフォルダーをエクスプローラーで開くと、バケットの内容が表示
 
 ## コマンドラインの構成
 
-OSVFS は意図的に**設定ファイル駆動**です。各マウントの設定 (`bucket` /
+S3VFS は意図的に**設定ファイル駆動**です。各マウントの設定 (`bucket` /
 `root-folder` / `region` / `aws-profile` / `bandwidth-up` /
-`retry-max-attempts` …) はすべて `osvfs.toml` のみで管理します。CLI が
+`retry-max-attempts` …) はすべて `s3vfs.toml` のみで管理します。CLI が
 受け付けるのは次の 3 つだけです。
 
 | 構成要素 | 用途 |
 | --- | --- |
 | サブコマンド (`mount` / `mount-all` / `credentials` / `doctor` / `lost-and-found`) | どのマウントを起動するか、暗号化された認証情報ストアの管理、環境セルフチェック、または隔離された退避ファイルの確認・復元 |
-| `--name <mount>` | `osvfs mount` で `[[mount]]` 配列の中から 1 つ選ぶ |
+| `--name <mount>` | `s3vfs mount` で `[[mount]]` 配列の中から 1 つ選ぶ |
 | `--verbose` / `--log-format` | デバッグ用のプロセスレベル一時上書き。TOML の `verbose` / `log-format` も引き続き有効で、両方ある場合は CLI が勝ちます |
 
 バケット内の特定のサブツリーだけを投影したい場合 (例えば
@@ -106,10 +106,10 @@ OSVFS は意図的に**設定ファイル駆動**です。各マウントの設�
 **優先度の低い順**でマージし、後のソースが先のソースを**キー単位で上書き**
 します。
 
-1. **`osvfs.exe` と同階層の `osvfs.toml`** (最低優先度。配布物に同梱する
+1. **`s3vfs.exe` と同階層の `s3vfs.toml`** (最低優先度。配布物に同梱する
    ベースライン)。`AppContext.BaseDirectory` で解決するため、カレント
    ディレクトリに依存せず常に exe 隣を見ます。
-2. **`%APPDATA%\OSVFS\config.toml`** (ユーザー単位 / マシン共通)。認証情報
+2. **`%APPDATA%\S3VFS\config.toml`** (ユーザー単位 / マシン共通)。認証情報
    やログ設定など、ユーザー個別の値を置く場所として推奨します。
 3. **`--config <path>`** (最高優先度)。標準の保存場所を編集せず、複数の
    設定ファイルを切り替えたい場合に便利。1, 2 と異なり、指定したパスが
@@ -122,9 +122,9 @@ OSVFS は意図的に**設定ファイル駆動**です。各マウントの設�
 と対話プロンプトのみが入力源です。
 
 ```toml
-# ./osvfs.toml もしくは %APPDATA%\OSVFS\config.toml
+# ./s3vfs.toml もしくは %APPDATA%\S3VFS\config.toml
 bucket               = "my-bucket"
-root-folder          = "C:/Users/you/OSVFS"
+root-folder          = "C:/Users/you/S3VFS"
 endpoint-url         = "http://localhost:4566"   # 任意
 region               = "ap-northeast-1"          # 任意
 prefix               = "team-a/"                 # 任意
@@ -146,9 +146,9 @@ sync-mode            = "on-demand"               # "on-demand" | "full" — poll
 event-queue          = ""                        # SQS URL/名。events で必須
 ```
 
-編集用のサンプル [`osvfs.toml.example`](./osvfs.toml.example) をリポジトリ
-ルートに同梱しています。`dotnet publish` 時には `osvfs.exe` と同じ階層にも
-コピーされるので、`osvfs.toml` (または `%APPDATA%\OSVFS\config.toml`) に
+編集用のサンプル [`s3vfs.toml.example`](./s3vfs.toml.example) をリポジトリ
+ルートに同梱しています。`dotnet publish` 時には `s3vfs.exe` と同じ階層にも
+コピーされるので、`s3vfs.toml` (または `%APPDATA%\S3VFS\config.toml`) に
 リネームして必要なキーをコメントアウト解除するだけで使えます。
 
 キーはケバブケース (`root-folder`) とスネークケース (`root_folder`) のど
@@ -156,7 +156,7 @@ event-queue          = ""                        # SQS URL/名。events で必�
 次のように短く済みます。
 
 ```powershell
-osvfs                       # オプションはすべて osvfs.toml から取得
+s3vfs                       # オプションはすべて s3vfs.toml から取得
 ```
 
 #### 1 ファイルで複数マウント
@@ -168,19 +168,19 @@ osvfs                       # オプションはすべて osvfs.toml から取�
 ルートに置き、すべてのマウントに適用されます。
 
 ```toml
-# ./osvfs.toml — 複数マウント
+# ./s3vfs.toml — 複数マウント
 verbose   = false
 log-format = "json"
 
 [[mount]]
 name        = "personal"
 bucket      = "my-personal"
-root-folder = "C:/Users/you/OSVFS-personal"
+root-folder = "C:/Users/you/S3VFS-personal"
 
 [[mount]]
 name        = "work"
 bucket      = "my-work"
-root-folder = "C:/Users/you/OSVFS-work"
+root-folder = "C:/Users/you/S3VFS-work"
 prefix      = "team-a/"
 aws-profile = "prod-readonly"
 ```
@@ -192,16 +192,16 @@ aws-profile = "prod-readonly"
 を混在させると優先順位があいまいになるため、混在は明示的なエラーで拒否
 します。
 
-ファイルが 2 つ以上のマウントを宣言している場合、引数なしの `osvfs` は
+ファイルが 2 つ以上のマウントを宣言している場合、引数なしの `s3vfs` は
 どのマウントを起動すべきか判断できないので、次のいずれかを使います。
 
 ```powershell
-osvfs mount-all                 # 全 [[mount]] をこのプロセスで起動
-osvfs mount --name personal     # 名前指定で 1 つだけ起動
-osvfs mount --name work         # 同じ設定ファイル内の別マウントを起動
+s3vfs mount-all                 # 全 [[mount]] をこのプロセスで起動
+s3vfs mount --name personal     # 名前指定で 1 つだけ起動
+s3vfs mount --name work         # 同じ設定ファイル内の別マウントを起動
 ```
 
 各マウントは独自の `ProjFsProvider` で動作します。ログは
-`OSVFS.Mount.<name>` カテゴリに分類されるので text / JSON フォーマット
+`S3VFS.Mount.<name>` カテゴリに分類されるので text / JSON フォーマット
 のいずれでもマウント名で識別できます。ホストプロセスで Enter を押すと
 逐次逆順 (最後に起動したマウントから先に) シャットダウンします。

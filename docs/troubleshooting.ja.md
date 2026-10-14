@@ -2,7 +2,7 @@
 
 [← README に戻る](../README.ja.md) · [English](./troubleshooting.md)
 
-`osvfs doctor` セルフチェックと `osvfs lost-and-found` 退避ファイル
+`s3vfs doctor` セルフチェックと `s3vfs lost-and-found` 退避ファイル
 復元 CLI の使い方。
 
 ---
@@ -11,18 +11,18 @@
 
 マウントが起動しない (`StartVirtualizing failed`、"bucket not found"、
 "AccessDenied"、認証情報の有効期限切れ など) ときは **まず
-`osvfs doctor` を実行してください**。doctor は読み取り専用の環境
+`s3vfs doctor` を実行してください**。doctor は読み取り専用の環境
 セルフチェックを順番に実行し、色付きのサマリーを出力します。
 
 ```powershell
-# osvfs.toml の最初の [[mount]] からバケット / リージョン / プロファイルを引用
-osvfs doctor
+# s3vfs.toml の最初の [[mount]] からバケット / リージョン / プロファイルを引用
+s3vfs doctor
 
 # CLI で完全に上書き (まだ設定ファイルがないとき向け)
-osvfs doctor --bucket my-bucket --region ap-northeast-1 --profile prod
+s3vfs doctor --bucket my-bucket --region ap-northeast-1 --profile prod
 
 # LocalStack / MinIO 風
-osvfs doctor --bucket my-bucket --endpoint-url http://localhost:4566
+s3vfs doctor --bucket my-bucket --endpoint-url http://localhost:4566
 ```
 
 doctor が確認する項目は以下の順です。
@@ -36,13 +36,13 @@ doctor が確認する項目は以下の順です。
    レジストリ確認では拾えない「機能はインストール済みだが PrjFlt
    サービスが停止」「EDR / アンチウイルスがブロック」といった失敗を
    検出できます。
-3. **AWS 認証情報の解決** — OSVFS プロファイル (`--profile`) または
+3. **AWS 認証情報の解決** — S3VFS プロファイル (`--profile`) または
    SDK チェーンから資格情報を解決し、ソース・アクセスキーの末尾 4
    桁・一時資格情報 (セッショントークン保持) かどうかを表示します。
 4. **バケット到達性 (`HeadBucket`)** — `GetBucketLocation` を呼び
    出します。403 はリスト権限不足、404 はリージョン違いの可能性が
    高いです。
-5. **バケットバージョニング** — OSVFS の衝突解決に必須です。
+5. **バケットバージョニング** — S3VFS の衝突解決に必須です。
    未設定 / Suspended の場合は、有効化のための
    `aws s3api put-bucket-versioning` コマンドをそのまま提示します。
 
@@ -51,8 +51,8 @@ doctor が確認する項目は以下の順です。
 **2** で終了するため、起動スクリプトの先頭にも組み込めます。
 
 ```powershell
-osvfs doctor --bucket $env:OSVFS_BUCKET; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-osvfs mount-all
+s3vfs doctor --bucket $env:S3VFS_BUCKET; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+s3vfs mount-all
 ```
 
 `NO_COLOR=1` の指定や stdout のリダイレクトでは ANSI 制御コードを
@@ -64,25 +64,25 @@ osvfs mount-all
 リモート側の変更が同期されていないローカル編集と衝突したとき、ウォッ
 チャーは「リモート側が真」というポリシーに従ってローカルファイルを上書
 きしますが、上書き直前にダーティなローカルコピーをマウント直下の
-`.osvfs-lost+found` ディレクトリへ退避します。`osvfs lost-and-found`
+`.s3vfs-lost+found` ディレクトリへ退避します。`s3vfs lost-and-found`
 サブコマンドを使うと、シェルだけでこれらの退避ファイルを確認し復元
 できます。
 
 ```powershell
 # 退避ファイル一覧 (新しい順)。元のパスとサイズも表示されます
-osvfs lost-and-found list
+s3vfs lost-and-found list
 
-# osvfs.toml に複数マウントがある場合は --name で 1 つを選択
-osvfs lost-and-found list --name docs
+# s3vfs.toml に複数マウントがある場合は --name で 1 つを選択
+s3vfs lost-and-found list --name docs
 
 # 退避ファイルと現在のリモートオブジェクトを diff
 # テキスト: 外部 `git diff --no-index --color`
 # バイナリ (先頭 8 KiB に NUL バイトあり): SHA-256 とサイズの比較
-osvfs lost-and-found diff 20260510T123456789Z_docs%2Fnotes.md
+s3vfs lost-and-found diff 20260510T123456789Z_docs%2Fnotes.md
 
 # 退避ファイルを任意の場所にコピー
 # (--target を省略するとカレントディレクトリへ元ファイル名で保存)
-osvfs lost-and-found restore 20260510T123456789Z_docs%2Fnotes.md `
+s3vfs lost-and-found restore 20260510T123456789Z_docs%2Fnotes.md `
   --target C:\Users\you\Desktop\notes-recovered.md
 ```
 

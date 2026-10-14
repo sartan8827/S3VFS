@@ -4,20 +4,20 @@
 
 帯域制御、multipart アップロードのしきい値、リクエスト並列度、HTTP
 トランスポート、リトライポリシー。各ノブは
-[`osvfs.toml`](./configuration.ja.md) のキーと対応します。
+[`s3vfs.toml`](./configuration.ja.md) のキーと対応します。
 
 ---
 
 ## 帯域制御
 
-`osvfs` は長時間バックグラウンドで動くプロセスのため、大きな hydrate や
+`s3vfs` は長時間バックグラウンドで動くプロセスのため、大きな hydrate や
 アップロードが回線を食い潰すと同居アプリケーションのレスポンスを劣化させ
-ます。[`osvfs.toml`](#設定ファイル) の `bandwidth-up` / `bandwidth-down`
+ます。[`s3vfs.toml`](#設定ファイル) の `bandwidth-up` / `bandwidth-down`
 で双方向独立に上限を指定できます。
 
 ```toml
 bucket         = "my-bucket"
-root-folder    = "C:/Users/you/OSVFS"
+root-folder    = "C:/Users/you/S3VFS"
 bandwidth-up   = "5M"       # アップロードを 5 MiB/s に制限
 bandwidth-down = "10M"      # ダウンロードを 10 MiB/s に制限
 ```
@@ -31,7 +31,7 @@ bandwidth-down = "10M"      # ダウンロードを 10 MiB/s に制限
 
 ## multipart アップロードのチューニング
 
-`osvfs` は `multipart-threshold` 以上のアップロードを S3 multipart
+`s3vfs` は `multipart-threshold` 以上のアップロードを S3 multipart
 パスに振り分け、ペイロードを `multipart-part-size` のチャンクに分割
 して `TransferUtility` が並列にアップロードします。既定値 (閾値 16 MiB
 / パートサイズ 5 MiB) は AWS SDK v4 の `MinSizeBeforePartUpload` 既定値
@@ -44,7 +44,7 @@ bandwidth-down = "10M"      # ダウンロードを 10 MiB/s に制限
 | 不安定な回線 | 既定値 | パートが小さいほどリトライ時の再送量も小さい |
 
 S3 はパートサイズに 3 つの上限を設けています。いずれを破っても
-`osvfs` は起動を拒否し、サーバ側も Complete 時にアップロードを失敗
+`s3vfs` は起動を拒否し、サーバ側も Complete 時にアップロードを失敗
 させます。
 
 - `multipart-part-size` は **5 MiB (`5M`) 以上**であること。最終
@@ -59,9 +59,9 @@ S3 はパートサイズに 3 つの上限を設けています。いずれを�
 
 ## リクエスト並列度のチューニング
 
-`osvfs` は方向ごとの S3 同時呼び出し数を上限で抑え、ハイドレーションや
+`s3vfs` は方向ごとの S3 同時呼び出し数を上限で抑え、ハイドレーションや
 バックグラウンドアップロードのバーストが SDK の HTTP プールやバケット
-を圧迫しないようにしています。`osvfs.toml` の独立した 3 つのキーで上限
+を圧迫しないようにしています。`s3vfs.toml` の独立した 3 つのキーで上限
 を制御します。
 
 | キー | 既定値 | 制限対象 |
@@ -86,18 +86,18 @@ S3 はパートサイズに 3 つの上限を設けています。いずれを�
 
 ```toml
 bucket                    = "my-bucket"
-root-folder               = "C:/Users/you/OSVFS"
+root-folder               = "C:/Users/you/S3VFS"
 max-concurrent-uploads    = 4
 max-concurrent-downloads  = 8
 max-multipart-parts       = 10
 ```
 
 3 つのキーはいずれも 1 以上である必要があります。0 や負の値が指定された
-場合 OSVFS は起動時に拒否します。
+場合 S3VFS は起動時に拒否します。
 
 ## HTTP トランスポートのチューニング
 
-OSVFS は AWS SDK に独自の `HttpClientFactory` を渡し、内部の
+S3VFS は AWS SDK に独自の `HttpClientFactory` を渡し、内部の
 `SocketsHttpHandler` を「コネクション無期限保持・プール上限なし」と
 いうフレームワーク既定値ではなく、運用上安全な値に明示固定します。
 ファクトリはバックエンドごとに 1 つだけ生成され、マウントの寿命と同じ
@@ -112,7 +112,7 @@ DNS の固定化を起こさずに長時間の高スループット通信を継�
 | `EnableMultipleHttp2Connections` | `true` | 単一の HTTP/2 接続が `SETTINGS_MAX_CONCURRENT_STREAMS` を使い切った際に、追加の接続をプールが開けるようにします |
 | HTTP/2 への昇格 | AWS エンドポイントで有効 | 送出リクエストを `HttpVersion.Version20` + `RequestVersionOrLower` ポリシーで発行するため、HTTP/1.1 しか話さないエンドポイント (LocalStack、MinIO) は透過的に HTTP/1.1 へネゴシエーションダウンします。`endpoint-url` が設定されている場合は無効です |
 
-これらの値は `osvfs.toml` から変更できません。サポート対象のすべての
+これらの値は `s3vfs.toml` から変更できません。サポート対象のすべての
 構成で適切な値であり、マウント単位でチューニングする運用上の理由が
 存在しないためです。AWS 以外でコネクションのセマンティクスが大きく
 異なるオブジェクトストアに対してフォークする場合のみ、コードを直接
@@ -121,7 +121,7 @@ DNS の固定化を起こさずに長時間の高スループット通信を継�
 ## リトライポリシー
 
 オブジェクトストアの一時的な失敗は AWS SDK のリトライパイプラインに委
-ねており、OSVFS は `RetryMode.Adaptive` (標準の指数バックオフに加えて、
+ねており、S3VFS は `RetryMode.Adaptive` (標準の指数バックオフに加えて、
 サービスが過負荷を返した際に後続リクエストを抑止するクライアントサイド
 スロットリング用トークンバケット) と `MaxErrorRetry = retry-max-attempts − 1`
 を設定します。リトライ対象のエラー分類は SDK 組み込みのものを利用しま
@@ -145,7 +145,7 @@ SDK のリトライは 0 回になり、初回呼び出しのみが実行され�
 
 ```toml
 bucket             = "my-bucket"
-root-folder        = "C:/Users/you/OSVFS"
+root-folder        = "C:/Users/you/S3VFS"
 retry-max-attempts = 5         # 試行回数 5 回 (初回 1 + リトライ 4)
 ```
 

@@ -2,7 +2,7 @@
 
 [← Back to README](../README.md) · [日本語版](./credentials.ja.md)
 
-How OSVFS resolves AWS credentials. Covers the OSVFS DPAPI-encrypted
+How S3VFS resolves AWS credentials. Covers the S3VFS DPAPI-encrypted
 credential store, AWS IAM Identity Center (SSO), and AWS CLI 2.32+
 `aws login`.
 
@@ -10,7 +10,7 @@ credential store, AWS IAM Identity Center (SSO), and AWS CLI 2.32+
 
 ## Managing AWS credentials
 
-OSVFS can resolve AWS credentials through the standard AWS SDK chain
+S3VFS can resolve AWS credentials through the standard AWS SDK chain
 (environment variables, the shared `~/.aws/credentials` profile, IAM role,
 IMDS), **or** through its own per-user encrypted store backed by Windows
 Credential Manager. The secret access key — and any STS session token — is
@@ -20,37 +20,37 @@ it on the same machine.
 
 ```powershell
 # Save a profile (the secret prompt is masked)
-osvfs credentials set --profile prod
+s3vfs credentials set --profile prod
 
 # Or pass everything on the command line (skip the prompts)
-osvfs credentials set --profile prod `
+s3vfs credentials set --profile prod `
   --access-key AKIA... `
   --secret-key ... `
   --session-token ...   # optional, for temporary credentials
 
 # Inspect a profile (the secret is never echoed)
-osvfs credentials get --profile prod
+s3vfs credentials get --profile prod
 
-# List every profile owned by OSVFS
-osvfs credentials list
+# List every profile owned by S3VFS
+s3vfs credentials list
 
 # Delete a profile
-osvfs credentials remove --profile prod
+s3vfs credentials remove --profile prod
 ```
 
 Then reference the profile in your mount config:
 
 ```toml
 bucket      = "my-bucket"
-root-folder = "C:/Users/you/OSVFS"
+root-folder = "C:/Users/you/S3VFS"
 aws-profile = "prod"
 ```
 
 Each entry is stored as a Windows generic credential under the target name
-`OSVFS:AWS:<profile>`. The credential persists at `LocalMachine` scope
+`S3VFS:AWS:<profile>`. The credential persists at `LocalMachine` scope
 (it survives logout) but the DPAPI envelope is bound to the saving user, so
 copying the entry to another user — or to another machine — will fail to
-decrypt. Treat the OSVFS store as a per-user convenience cache, not as a
+decrypt. Treat the S3VFS store as a per-user convenience cache, not as a
 backup of your AWS credentials.
 
 #### Sign in via AWS IAM Identity Center (SSO)
@@ -59,8 +59,8 @@ For environments that use AWS IAM Identity Center (formerly AWS SSO), use
 the AWS CLI's built-in `aws configure sso` flow — it writes an
 `sso_session` profile to `~/.aws/config`, caches the bearer token under
 `~/.aws/sso/cache/`, and the AWS SDK auto-refreshes the role credentials
-on every request. OSVFS picks the profile up through the SDK shared-profile
-chain, so there is no OSVFS-specific SSO command to learn.
+on every request. S3VFS picks the profile up through the SDK shared-profile
+chain, so there is no S3VFS-specific SSO command to learn.
 
 1. **Run the SDK's wizard** (writes an `sso-session` block + a profile
    referencing it; see
@@ -86,16 +86,16 @@ chain, so there is no OSVFS-specific SSO command to learn.
    ```powershell
    aws sso login --sso-session my-org
    ```
-3. **Reference the profile from `osvfs.toml`** exactly like any other
-   profile name. The OSVFS DPAPI store is consulted first; on a miss OSVFS
+3. **Reference the profile from `s3vfs.toml`** exactly like any other
+   profile name. The S3VFS DPAPI store is consulted first; on a miss S3VFS
    falls back to the shared profile chain and picks up the SSO entry:
    ```toml
    bucket      = "my-bucket"
-   root-folder = "C:/Users/you/OSVFS"
+   root-folder = "C:/Users/you/S3VFS"
    aws-profile = "prod"
    ```
 
-`osvfs doctor --profile prod` reports the resolution path
+`s3vfs doctor --profile prod` reports the resolution path
 (e.g. `shared profile 'prod' (sso)`) so you can confirm the SDK chain is
 serving the credentials.
 
@@ -103,9 +103,9 @@ serving the credentials.
 
 The SDK's `SSOAWSCredentials` (and the matching wrappers for
 `credential_process`, `AssumeRole`, …) all roll their short-term
-credentials over before expiry on every signed request — OSVFS does not
+credentials over before expiry on every signed request — S3VFS does not
 need to do anything for the happy path. As an additional safety net,
-OSVFS catches the rare on-the-wire `ExpiredToken` response that slips
+S3VFS catches the rare on-the-wire `ExpiredToken` response that slips
 past the SDK's preempt window (machine sleep / resume, large clock skew),
 calls `ClearCredentials()` on the SDK's refreshing wrapper, and retries
 the request once.
@@ -113,9 +113,9 @@ the request once.
 - **Retry succeeds**: a single Information log line records the new
   expiration; the mount keeps running.
 - **Retry fails** (the upstream bearer / refresh token has itself
-  expired): a Windows balloon-tip notification "OSVFS: AWS credentials
+  expired): a Windows balloon-tip notification "S3VFS: AWS credentials
   expired" tells the operator to re-run `aws sso login` (or
-  `aws login` / `osvfs credentials set`) to re-authenticate, and the
+  `aws login` / `s3vfs credentials set`) to re-authenticate, and the
   failed request's exception propagates back to the caller.
 
 #### Sign in via `aws login` (AWS CLI 2.32+)
@@ -123,7 +123,7 @@ the request once.
 For environments **not** using IAM Identity Center, AWS CLI v2.32.0 introduced
 `aws login` — an OAuth 2.0 + PKCE flow that converts your AWS Management Console
 sign-in into auto-refreshing temporary credentials (up to 12 hours). The OAuth
-client and endpoints are reserved for the AWS CLI itself, so OSVFS integrates by
+client and endpoints are reserved for the AWS CLI itself, so S3VFS integrates by
 **referencing the resulting `~/.aws/config` profile through the SDK
 shared-profile chain** (the AWS-recommended `credential_process` pattern).
 
@@ -143,21 +143,21 @@ shared-profile chain** (the AWS-recommended `credential_process` pattern).
    login_session = arn:aws:iam::123456789012:user/you
    region = us-east-1
 
-   [profile osvfs-login]
+   [profile s3vfs-login]
    credential_process = aws configure export-credentials --profile signin --format process
    region = us-east-1
    ```
-4. **Reference it from `osvfs.toml`** like any other profile — when the name is
-   absent from the OSVFS DPAPI store, OSVFS falls back to the SDK shared-profile
+4. **Reference it from `s3vfs.toml`** like any other profile — when the name is
+   absent from the S3VFS DPAPI store, S3VFS falls back to the SDK shared-profile
    chain and picks up the `credential_process` entry:
    ```toml
    bucket      = "my-bucket"
-   root-folder = "C:/Users/you/OSVFS"
-   aws-profile = "osvfs-login"
+   root-folder = "C:/Users/you/S3VFS"
+   aws-profile = "s3vfs-login"
    ```
 
-`osvfs doctor --profile osvfs-login` reports the resolution path so you can
+`s3vfs doctor --profile s3vfs-login` reports the resolution path so you can
 confirm the credentials came from the shared file (e.g.
-`shared profile 'osvfs-login' (credential_process)`) rather than the SDK
+`shared profile 's3vfs-login' (credential_process)`) rather than the SDK
 default chain.
 

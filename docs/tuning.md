@@ -4,20 +4,20 @@
 
 Bandwidth ceilings, multipart upload thresholds, request concurrency, the
 underlying HTTP transport, and the retry policy. All knobs map to keys in
-[`osvfs.toml`](./configuration.md).
+[`s3vfs.toml`](./configuration.md).
 
 ---
 
 ## Bandwidth limits
 
-`osvfs` runs as a long-lived background process, so a single large hydration
+`s3vfs` runs as a long-lived background process, so a single large hydration
 or upload can saturate the link and starve other applications. Set
 `bandwidth-up` / `bandwidth-down` in
-[`osvfs.toml`](#configuration-file) to cap each direction independently:
+[`s3vfs.toml`](#configuration-file) to cap each direction independently:
 
 ```toml
 bucket         = "my-bucket"
-root-folder    = "C:/Users/you/OSVFS"
+root-folder    = "C:/Users/you/S3VFS"
 bandwidth-up   = "5M"       # cap uploads at 5 MiB/s
 bandwidth-down = "10M"      # cap downloads at 10 MiB/s
 ```
@@ -32,7 +32,7 @@ both paced by the same ceiling.
 
 ## Tuning multipart uploads
 
-`osvfs` routes any upload at or above `multipart-threshold` through the
+`s3vfs` routes any upload at or above `multipart-threshold` through the
 S3 multipart path, splitting the payload into `multipart-part-size`
 chunks that `TransferUtility` uploads in parallel. The defaults (16 MiB
 threshold, 5 MiB parts) match the AWS SDK v4 default for
@@ -46,7 +46,7 @@ explicit tuning:
 | Constrained networks | Keep defaults | Smaller parts mean a network blip retries less data. |
 
 S3 enforces three hard limits on the part size — you must stay inside
-all of them or `osvfs` refuses to start, and the service rejects the
+all of them or `s3vfs` refuses to start, and the service rejects the
 upload at completion time:
 
 - `multipart-part-size` must be **≥ 5 MiB** (`5M`). Smaller parts are
@@ -60,9 +60,9 @@ upload at completion time:
 
 ## Tuning request concurrency
 
-`osvfs` caps the number of in-flight S3 calls per direction so a burst of
+`s3vfs` caps the number of in-flight S3 calls per direction so a burst of
 hydrations or background uploads cannot saturate the SDK's HTTP pool or
-overwhelm the bucket. Three independent knobs in `osvfs.toml` control the
+overwhelm the bucket. Three independent knobs in `s3vfs.toml` control the
 ceiling:
 
 | Key | Default | What it bounds |
@@ -88,18 +88,18 @@ so connection exhaustion is not the binding constraint.
 
 ```toml
 bucket                    = "my-bucket"
-root-folder               = "C:/Users/you/OSVFS"
+root-folder               = "C:/Users/you/S3VFS"
 max-concurrent-uploads    = 4
 max-concurrent-downloads  = 8
 max-multipart-parts       = 10
 ```
 
-All three values must be ≥ 1; OSVFS rejects zero or negative values at
+All three values must be ≥ 1; S3VFS rejects zero or negative values at
 startup.
 
 ## HTTP transport tuning
 
-OSVFS hands the AWS SDK a custom `HttpClientFactory` so the underlying
+S3VFS hands the AWS SDK a custom `HttpClientFactory` so the underlying
 `SocketsHttpHandler` is pinned to operationally-safe defaults instead of
 the framework's "infinite lifetime, unbounded pool" defaults. The factory
 is built once per backend and shared with the SDK for the lifetime of the
@@ -114,14 +114,14 @@ sessions without leaking sockets or pinning a stale DNS answer.
 | `EnableMultipleHttp2Connections` | `true` | Lets the pool open additional HTTP/2 connections when a single one runs out of `SETTINGS_MAX_CONCURRENT_STREAMS`. |
 | HTTP/2 promotion | enabled for AWS endpoints | Outbound requests are issued with `HttpVersion.Version20` and `RequestVersionOrLower` policy, so endpoints that only speak HTTP/1.1 (LocalStack, MinIO) negotiate down transparently. Disabled when `endpoint-url` is set. |
 
-These knobs are not surfaced in `osvfs.toml` — the values above are
+These knobs are not surfaced in `s3vfs.toml` — the values above are
 appropriate for every supported deployment and have no operational reason
 to be tuned per mount. Override them in code if you fork the project for
 a non-AWS object store with materially different connection semantics.
 
 ## Retry policy
 
-Transient object-store failures are retried by the AWS SDK pipeline. OSVFS
+Transient object-store failures are retried by the AWS SDK pipeline. S3VFS
 configures the client with `RetryMode.Adaptive` (the SDK's adaptive
 client-side throttling, which combines the standard exponential backoff with
 a token bucket that suppresses request bursts when the service signals
@@ -146,7 +146,7 @@ three times without restarting the whole multi-GiB upload.
 
 ```toml
 bucket             = "my-bucket"
-root-folder        = "C:/Users/you/OSVFS"
+root-folder        = "C:/Users/you/S3VFS"
 retry-max-attempts = 5         # 5 total attempts (1 initial + 4 retries)
 ```
 
