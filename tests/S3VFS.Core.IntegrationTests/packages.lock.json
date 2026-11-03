@@ -4,20 +4,20 @@
     "net10.0": {
       "AWSSDK.S3": {
         "type": "Direct",
-        "requested": "[4.0.23.3, )",
-        "resolved": "4.0.23.3",
-        "contentHash": "ASgWIoX8j6gG4plWXc22vGx0vVwDuqtjBwl3I2ICa2g6kqneSk47eYlGtRg61M/I8gvvtP8uDpIN73FsmlwqHg==",
+        "requested": "[4.0.104.8, )",
+        "resolved": "4.0.104.8",
+        "contentHash": "ER6j94bekBn/YWpcUFArckk+JSObzMZHqHvj1djy5KAMeaG71BBDOJvEQNGFRvc4CUITfJmD/9T87t8b+xnlkg==",
         "dependencies": {
-          "AWSSDK.Core": "[4.0.7.1, 5.0.0)"
+          "AWSSDK.Core": "[4.0.102.14, 5.0.0)"
         }
       },
       "AWSSDK.SQS": {
         "type": "Direct",
-        "requested": "[4.0.2.31, )",
-        "resolved": "4.0.2.31",
-        "contentHash": "KaOEMO0Wz5dDxbIeqPL53zqKeixRXR2S7ByypWp52cphG3FFC7wsbQHku4xtW3d1Zteguzx7TkNOnajko6QRig==",
+        "requested": "[4.0.100.22, )",
+        "resolved": "4.0.100.22",
+        "contentHash": "39+Z2bX8XEFqx24IYIakVClRkaIYEOudcoNBrKqMOd3YVsS1q316JyXfdFKmw4mdFh8tIz1pCSQ/l4qfpfBKfg==",
         "dependencies": {
-          "AWSSDK.Core": "[4.0.7.1, 5.0.0)"
+          "AWSSDK.Core": "[4.0.102.15, 5.0.0)"
         }
       },
       "Microsoft.NET.Test.Sdk": {
@@ -82,8 +82,8 @@
       },
       "AWSSDK.Core": {
         "type": "Transitive",
-        "resolved": "4.0.7.1",
-        "contentHash": "XA0GHLwEMkoVu3u8neKnLEDD9ViXpn26ie9UhKXZXYRzCRfSFrLWpBOhupWlf+cJEFBYCC5mx2NsN8h59Y+M2Q=="
+        "resolved": "4.0.102.15",
+        "contentHash": "GGqiCBOGPKUkkSkTRB3oXcdvz7PzMEGwXu5WI4V+gDZQm0oPg+SGqKe+1OeMEnZmiIyqhIoYph3uI17HJZ2ynQ=="
       },
       "BouncyCastle.Cryptography": {
         "type": "Transitive",
@@ -255,8 +255,8 @@
       "s3vfs.core": {
         "type": "Project",
         "dependencies": {
-          "AWSSDK.S3": "[4.0.23.3, )",
-          "AWSSDK.SQS": "[4.0.2.31, )",
+          "AWSSDK.S3": "[4.0.104.8, )",
+          "AWSSDK.SQS": "[4.0.100.22, )",
           "AWSSDK.SSO": "[4.0.2.30, )",
           "AWSSDK.SSOOIDC": "[4.0.3.31, )",
           "Microsoft.Extensions.Logging.Abstractions": "[10.0.8, )"
