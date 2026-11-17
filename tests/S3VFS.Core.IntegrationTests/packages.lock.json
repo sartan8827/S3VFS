@@ -4,20 +4,20 @@
     "net10.0": {
       "AWSSDK.S3": {
         "type": "Direct",
-        "requested": "[4.0.23.3, )",
-        "resolved": "4.0.23.3",
-        "contentHash": "ASgWIoX8j6gG4plWXc22vGx0vVwDuqtjBwl3I2ICa2g6kqneSk47eYlGtRg61M/I8gvvtP8uDpIN73FsmlwqHg==",
+        "requested": "[4.1.1, )",
+        "resolved": "4.1.1",
+        "contentHash": "iqT0dNuaUHkh4hHyG40/brQj0220YomPzAmhSrx82xul+LNTUTMzxcQSQrD+rvtHMlOwxmqaN+xhCnthgKNIFw==",
         "dependencies": {
-          "AWSSDK.Core": "[4.0.7.1, 5.0.0)"
+          "AWSSDK.Core": "[4.1.1.1, 5.0.0)"
         }
       },
       "AWSSDK.SQS": {
         "type": "Direct",
-        "requested": "[4.0.2.31, )",
-        "resolved": "4.0.2.31",
-        "contentHash": "KaOEMO0Wz5dDxbIeqPL53zqKeixRXR2S7ByypWp52cphG3FFC7wsbQHku4xtW3d1Zteguzx7TkNOnajko6QRig==",
+        "requested": "[4.1.0.2, )",
+        "resolved": "4.1.0.2",
+        "contentHash": "clZzwfg/mOaW+q28fAcT92UO0XoFIdJiJ2DDfO1bGCC1UVm+aJTlSgpeE3W2tEvLnDNXXCp4O3JQAnXJ4/HefQ==",
         "dependencies": {
-          "AWSSDK.Core": "[4.0.7.1, 5.0.0)"
+          "AWSSDK.Core": "[4.1.1.1, 5.0.0)"
         }
       },
       "Microsoft.NET.Test.Sdk": {
@@ -82,8 +82,17 @@
       },
       "AWSSDK.Core": {
         "type": "Transitive",
-        "resolved": "4.0.7.1",
-        "contentHash": "XA0GHLwEMkoVu3u8neKnLEDD9ViXpn26ie9UhKXZXYRzCRfSFrLWpBOhupWlf+cJEFBYCC5mx2NsN8h59Y+M2Q=="
+        "resolved": "4.1.1.1",
+        "contentHash": "paZNy+g/hXMCsEpWvmOFr14x9gVzIY2JRSzSk+nXpKcnaASxEFBMWE4CNBuI/WwGN1ygTwojRTsPRn3yXuhSYQ==",
+        "dependencies": {
+          "AWSSDK.Extensions.Numerics": "[4.1.0, 5.0.0)",
+          "System.IO.Hashing": "11.0.0"
+        }
+      },
+      "AWSSDK.Extensions.Numerics": {
+        "type": "Transitive",
+        "resolved": "4.1.0",
+        "contentHash": "hhoiXT1aUyVgIiQbQoqG3L1EEneqXDh2GKyH5izUlO6Rzi9GAAi8S6mlLiVwow23+EGg77zHjdmUi+ia3RSUTg=="
       },
       "BouncyCastle.Cryptography": {
         "type": "Transitive",
@@ -209,8 +218,8 @@
       },
       "System.IO.Hashing": {
         "type": "Transitive",
-        "resolved": "10.0.8",
-        "contentHash": "+dJsbPJ3FyUbTZNplFj0RCKePFizmv6ewDV46JE9q/IVH4c3xTCftHfHelLsAKf0jryIPqgMb5GpS0x7TAY3mg=="
+        "resolved": "11.0.0",
+        "contentHash": "U+Bv2qCYt6eONi+arSP0QIp4uTO6os6uceBsqiAwruZ+Wo2HrRhO/0tj38M9URJtS+4DhAtT3ka2TGNFYsnhyQ=="
       },
       "xunit.abstractions": {
         "type": "Transitive",
@@ -255,8 +264,8 @@
       "s3vfs.core": {
         "type": "Project",
         "dependencies": {
-          "AWSSDK.S3": "[4.0.23.3, )",
-          "AWSSDK.SQS": "[4.0.2.31, )",
+          "AWSSDK.S3": "[4.1.1, )",
+          "AWSSDK.SQS": "[4.1.0.2, )",
           "AWSSDK.SSO": "[4.0.2.30, )",
           "AWSSDK.SSOOIDC": "[4.0.3.31, )",
           "Microsoft.Extensions.Logging.Abstractions": "[10.0.8, )"
